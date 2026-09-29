@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>เดินบัญชี — ภาพรวมการเงิน</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+  :root{
+    --ink:#15181D;
+    --ink-soft:#8A8E96;
+    --paper:#FCFBF9;
+    --paper-2:#F3F2EE;
+    --paper-3:#E8E6DF;
+    --text:#1B1C1E;
+    --text-soft:#68686A;
+    --gold:#D4A93C;
+    --gold-deep:#B8860B;
+    --maroon:#B23B3B;
+    --jade:#2F7D53;
+    --line: rgba(27,28,30,0.10);
+    --shadow: 0 4px 16px rgba(20,20,20,0.06);
+    --radius: 16px;
+    --sans: 'IBM Plex Sans Thai', system-ui, sans-serif;
+    --serif: 'Fraunces', Georgia, serif;
+  }
+  :root:not([data-theme="light"]) {
+    @media (prefers-color-scheme: dark){
+      --ink:#0E1013;
+      --ink-soft:#8D9199;
+      --paper:#121315;
+      --paper-2:#1B1C1F;
+      --paper-3:#26272B;
+      --text:#EDECE8;
+      --text-soft:#9A9A98;
+      --gold:#D2A44C;
+      --gold-deep:#E8BE6C;
+      --maroon:#E08282;
+      --jade:#6FBF93;
+      --line: rgba(237,231,214,0.10);
+      --shadow: 0 4px 18px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --ink:#0E1013;
+    --ink-soft:#8D9199;
+    --paper:#121315;
+    --paper-2:#1B1C1F;
+    --paper-3:#26272B;
+    --text:#EDECE8;
+    --text-soft:#9A9A98;
+    --gold:#D2A44C;
+    --gold-deep:#E8BE6C;
+    --maroon:#E08282;
+    --jade:#6FBF93;
+    --line: rgba(237,231,214,0.10);
+    --shadow: 0 4px 18px rgba(0,0,0,0.35);
+  }
+  *{box-sizing:border-box;}
+  html{scroll-padding-top: calc(72px + env(safe-area-inset-top,0px));}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--text);
+    font-family:var(--sans);
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+    -webkit-font-smoothing:antialiased;
+  }
+  .tabular{ font-variant-numeric: tabular-nums; }
+
+  /* ---------- Header / Nav ---------- */
+  header.app-header{
+    position:sticky; top:0; z-index:40;
+    background:var(--ink);
+    padding-top:env(safe-area-inset-top,0px);
+    box-shadow: var(--shadow);
+  }
+  .header-inner{
+    max-width:960px; margin:0 auto;
+    padding:16px 18px 12px;
+    display:flex; flex-direction:column; gap:14px;
+  }
+  .brand{
+    display:flex; align-items:baseline; gap:8px;
+    color:#F1ECDD;
+  }
+  .brand .mark{ font-family:var(--serif); font-size:22px; font-weight:600; letter-spacing:.2px;}
+  .brand .sub{ font-family:var(--sans); font-size:12.5px; color:#B9BFCE; }
+  nav.tabs{
+    display:flex; gap:6px; background:rgba(255,255,255,0.06);
+    padding:4px; border-radius:999px;
+  }
+  nav.tabs button{
+    flex:1; border:none; background:transparent; color:#C9CFDA;
+    font-family:var(--sans); font-weight:600; font-size:14px;
+    padding:9px 10px; border-radius:999px; cursor:pointer;
+    transition: background .18s ease, color .18s ease;
+  }
+  nav.tabs button.active{
+    background:var(--gold); color:#1C1404;
+  }
+
+  main{ max-width:960px; margin:0 auto; padding:22px 16px 120px; }
+  .view{ display:none; animation: fade .25s ease; }
+  .view.active{ display:block; }
+  @keyframes fade{ from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:none;} }
+
+  /* ---------- Overview ---------- */
+  .hero-card{
+    background:var(--paper-2);
+    border:1px solid var(--line);
+    border-radius: var(--radius);
+    padding:26px 24px;
+  }
+  .hero-label{ font-size:13px; color:var(--text-soft); margin:0 0 6px; }
+  .hero-number{
+    font-family:var(--serif); font-weight:700;
+    font-size:clamp(34px, 7vw, 54px);
+    color:var(--gold-deep);
+    margin:0; line-height:1.05;
+  }
+  .hero-sub{ display:flex; gap:18px; margin-top:14px; flex-wrap:wrap; }
+  .hero-sub .item{ font-size:13.5px; color:var(--text-soft); }
+  .hero-sub .item b{ display:block; font-size:16px; color:var(--text); margin-top:2px; }
+  .up{ color:var(--jade); } .down{ color:var(--maroon); }
+
+  .grid-2{ display:grid; grid-template-columns:1fr; gap:16px; margin-top:16px; }
+  @media(min-width:720px){ .grid-2{ grid-template-columns:1fr 1.15fr; } }
+  .panel{
+    background:var(--paper-2); border:1px solid var(--line);
+    border-radius:var(--radius); padding:18px;
+  }
+  .panel h3{ font-family:var(--serif); font-weight:600; font-size:17px; margin:0 0 14px; }
+  .legend{ display:flex; flex-wrap:wrap; gap:10px; margin-top:12px; }
+  .legend span{ font-size:12.5px; color:var(--text-soft); display:flex; align-items:center; gap:6px;}
+  .dot{ width:9px; height:9px; border-radius:50%; display:inline-block;}
+
+  /* ---------- Income & Expense ---------- */
+  .budget-bar{
+    background:var(--paper-2); border:1px solid var(--line);
+    border-radius:var(--radius); padding:16px 18px; margin-bottom:18px;
+  }
+  .budget-top{ display:flex; justify-content:space-between; font-size:13.5px; color:var(--text-soft); margin-bottom:8px;}
+  .budget-top b{ color:var(--text); font-weight:600; }
+  .budget-track{ height:8px; border-radius:999px; background:var(--paper-3); overflow:hidden; }
+  .budget-fill{ height:100%; background:var(--gold); border-radius:999px; }
+
+  .section-label{ font-size:13px; color:var(--text-soft); margin:22px 0 8px; }
+  .tx-list{ display:flex; flex-direction:column; border-top:1px solid var(--line); }
+  .tx-row{
+    display:flex; align-items:center; gap:12px;
+    padding:12px 2px; border-bottom:1px solid var(--line);
+  }
+  .tx-icon{
+    width:38px; height:38px; border-radius:11px; background:var(--paper-2);
+    display:flex; align-items:center; justify-content:center; font-size:18px; flex:none;
+  }
+  .tx-mid{ flex:1; min-width:0; }
+  .tx-title{ font-size:14.5px; font-weight:600; color:var(--text); }
+  .tx-meta{ font-size:12px; color:var(--text-soft); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tx-amt{ font-size:14.5px; font-weight:600; flex:none; }
+
+  .fab{
+    position:fixed; right:20px; bottom:calc(24px + env(safe-area-inset-bottom,0px));
+    width:58px; height:58px; border-radius:50%;
+    background:var(--gold); color:#1C1404; border:none;
+    font-size:28px; line-height:1; cursor:pointer;
+    box-shadow:0 12px 24px rgba(184,134,46,0.4);
+    z-index:45;
+  }
+
+  /* ---------- Investment ---------- */
+  .alloc-row{ margin-bottom:14px; }
+  .alloc-top{ display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px; }
+  .alloc-top .an{ font-weight:600; color:var(--text); }
+  .alloc-top .as{ color:var(--text-soft); }
+  .alloc-top .av{ font-weight:700; }
+  .alloc-track{ height:7px; border-radius:999px; background:var(--paper-3); overflow:hidden; position:relative; }
+  .alloc-fill{ height:100%; border-radius:999px; }
+  .alloc-target-mark{ position:absolute; top:-2px; width:2px; height:11px; background:var(--text); opacity:.5; }
+  .alloc-sub{ font-size:11.5px; color:var(--text-soft); margin-top:4px; }
+  .rebalance-note{ font-size:12px; color:var(--text-soft); margin:14px 0 0; padding-top:12px; border-top:1px solid var(--line); }
+  .ratio-row{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px; }
+  .ratio-card{ background:var(--paper-2); border:1px solid var(--line); border-radius:14px; padding:14px 16px; }
+  .ratio-card .rl{ font-size:12px; color:var(--text-soft); margin-bottom:6px; }
+  .ratio-card .rv{ font-family:var(--serif); font-size:24px; font-weight:700; }
+  .ratio-card .rt{ font-size:11px; margin-top:3px; }
+  .div-badge{ display:inline-block; font-size:11px; color:var(--jade); background:rgba(47,125,83,0.12); padding:2px 7px; border-radius:999px; margin-top:3px; }
+  .asset-group{ margin-bottom:22px; }
+  .asset-group h3{ font-family:var(--serif); font-size:16.5px; font-weight:600; margin:0 0 10px; color:var(--text-soft); }
+  .asset-card{
+    background:var(--paper-2); border:1px solid var(--line); border-radius:14px;
+    padding:14px 16px; margin-bottom:10px;
+    display:grid; grid-template-columns:1fr auto; gap:6px 14px; align-items:center;
+  }
+  .asset-name{ font-weight:700; font-size:14.5px; }
+  .asset-sub{ font-size:12px; color:var(--text-soft); grid-column:1; }
+  .asset-value{ text-align:right; font-weight:700; font-size:15px; }
+  .asset-pl{ text-align:right; font-size:12.5px; grid-column:2; }
+  .btn-ghost{
+    border:1px solid var(--line); background:transparent; color:var(--text);
+    font-family:var(--sans); font-size:13px; font-weight:600;
+    padding:8px 14px; border-radius:999px; cursor:pointer;
+  }
+  .row-between{ display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+
+  /* ---------- Investment: KPIs + allocation + holdings table ---------- */
+  .kpi-row{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin:14px 0 22px; }
+  @media(min-width:640px){ .kpi-row{ grid-template-columns:repeat(4,1fr); } }
+  .kpi-card{ background:var(--paper-2); border:1px solid var(--line); border-radius:14px; padding:13px 14px; }
+  .kpi-card .kl{ font-size:11px; color:var(--text-soft); margin-bottom:5px; line-height:1.3; }
+  .kpi-card .kv{ font-family:var(--serif); font-weight:600; font-size:19px; }
+
+  .alloc-panel{ margin-bottom:24px; }
+  .alloc-row{ margin-bottom:16px; }
+  .alloc-row:last-child{ margin-bottom:0; }
+  .alloc-top{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; font-size:13px; margin-bottom:6px; }
+  .alloc-top .g{ font-weight:700; }
+  .alloc-top .r{ color:var(--text-soft); font-size:11.5px; white-space:nowrap; }
+  .alloc-track{ height:10px; border-radius:999px; background:var(--paper-3); position:relative; overflow:visible; }
+  .alloc-fill{ height:100%; border-radius:999px; }
+  .alloc-target-mark{ position:absolute; top:-3px; width:2px; height:16px; background:var(--ink-soft); }
+  .alloc-role{ font-size:11.5px; color:var(--text-soft); margin-top:6px; }
+
+  .table-wrap{ overflow-x:auto; border:1px solid var(--line); border-radius:12px; margin-bottom:8px; }
+  table.holdings{ width:100%; border-collapse:collapse; font-size:12.5px; white-space:nowrap; }
+  table.holdings th{ text-align:right; font-weight:600; color:var(--text-soft); padding:9px 12px; border-bottom:1px solid var(--line); font-size:11px; background:var(--paper-2); }
+  table.holdings th:first-child, table.holdings td:first-child{ text-align:left; }
+  table.holdings td{ text-align:right; padding:9px 12px; border-bottom:1px solid var(--line); }
+  table.holdings tr:last-child td{ border-bottom:none; }
+  .group-note{ font-size:12px; color:var(--text-soft); background:var(--paper-2); border:1px dashed var(--line); border-radius:10px; padding:9px 12px; margin-top:8px; }
+
+  /* ---------- Sheet / Modal ---------- */
+  .sheet-backdrop{
+    position:fixed; inset:0; background:rgba(15,20,28,0.5);
+    display:none; align-items:flex-end; justify-content:center; z-index:60;
+  }
+  .sheet-backdrop.open{ display:flex; }
+  .sheet{
+    width:100%; max-width:520px; background:var(--paper);
+    border-radius:22px 22px 0 0; padding:20px 20px calc(24px + env(safe-area-inset-bottom,0px));
+    box-shadow:0 -12px 40px rgba(0,0,0,0.3);
+    max-height:88vh; overflow-y:auto;
+  }
+  .sheet h2{ font-family:var(--serif); font-size:20px; margin:2px 0 16px; }
+  .toggle-row{ display:flex; gap:8px; margin-bottom:16px; }
+  .toggle-row button{
+    flex:1; padding:10px; border-radius:12px; border:1px solid var(--line);
+    background:var(--paper-2); color:var(--text-soft); font-family:var(--sans); font-weight:600; cursor:pointer;
+  }
+  .toggle-row button.sel{ background:var(--ink); color:#F1ECDD; border-color:var(--ink); }
+  label{ display:block; font-size:12.5px; color:var(--text-soft); margin:14px 0 6px; }
+  input, select, textarea{
+    width:100%; padding:11px 12px; border-radius:11px; border:1px solid var(--line);
+    background:var(--paper-2); color:var(--text); font-family:var(--sans); font-size:14.5px;
+  }
+  .amt-input{ font-family:var(--serif); font-size:28px; font-weight:600; text-align:right; }
+  .sheet-actions{ display:flex; gap:10px; margin-top:20px; }
+  .btn-primary{
+    flex:1; background:var(--gold); color:#1C1404; border:none; border-radius:12px;
+    padding:13px; font-family:var(--sans); font-weight:700; font-size:15px; cursor:pointer;
+  }
+  .btn-secondary{
+    background:transparent; border:1px solid var(--line); color:var(--text-soft);
+    border-radius:12px; padding:13px 16px; font-family:var(--sans); font-weight:600; cursor:pointer;
+  }
+  .brand-row{ display:flex; align-items:center; justify-content:space-between; }
+  .icon-btn{
+    background:rgba(255,255,255,0.08); border:none; color:#F1ECDD;
+    width:36px; height:36px; border-radius:50%; font-size:15px; cursor:pointer; flex:none;
+  }
+  .manage-list{ display:flex; flex-direction:column; gap:6px; max-height:280px; overflow-y:auto; margin-bottom:12px; }
+  .manage-row{ display:flex; align-items:center; gap:10px; padding:9px 10px; background:var(--paper-2); border:1px solid var(--line); border-radius:10px; }
+  .manage-row .mi{ font-size:16px; width:22px; text-align:center; flex:none; }
+  .manage-row .mn{ flex:1; font-size:14px; }
+  .manage-row .mx{ border:none; background:transparent; color:var(--maroon); font-size:17px; cursor:pointer; padding:2px 8px; }
+  .add-row{ display:flex; gap:8px; }
+  .add-row input:first-child{ flex:none; width:64px; text-align:center; }
+  .add-row input:nth-child(2){ flex:1; }
+  .brand-row-btns{ display:flex; gap:8px; }
+  .login-screen{
+    position:fixed; inset:0; background:var(--paper); z-index:100;
+    display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  .login-screen.hide{ display:none; }
+  .login-box{ width:100%; max-width:360px; }
+  .login-mark{ font-family:var(--serif); font-size:28px; font-weight:700; color:var(--gold-deep); text-align:center; margin:0 0 4px; }
+  .login-sub{ text-align:center; color:var(--text-soft); font-size:13.5px; margin:0 0 24px; }
+  .login-error{ color:var(--maroon); font-size:12.5px; min-height:16px; margin:10px 0 0; }
+  .note-mock{ font-size:11.5px; color:var(--text-soft); text-align:center; margin-top:26px; }
+</style>
+</head>
+<body>
+
+<div class="login-screen" id="loginScreen">
+  <div class="login-box">
+    <p class="login-mark">เดินบัญชี</p>
+    <p class="login-sub">เข้าสู่ระบบเพื่อดูข้อมูลของคุณ</p>
+    <label>อีเมล</label>
+    <input id="loginEmail" type="email" placeholder="you@email.com">
+    <label>รหัสผ่าน</label>
+    <input id="loginPassword" type="password" placeholder="••••••••">
+    <p class="login-error" id="loginError"></p>
+    <div class="sheet-actions" style="margin-top:18px;">
+      <button class="btn-primary" id="loginBtn" type="button">เข้าสู่ระบบ</button>
+    </div>
+  </div>
+</div>
+
+<header class="app-header">
+  <div class="header-inner">
+    <div class="brand-row">
+      <div class="brand">
+        <span class="mark">เดินบัญชี</span>
+        <span class="sub">เงิน · การลงทุน · ทุกวัน</span>
+      </div>
+      <div class="brand-row-btns">
+        <button class="icon-btn" id="openManage" title="จัดการกระเป๋า/หมวดหมู่">⚙</button>
+        <button class="icon-btn" id="logoutBtn" title="ออกจากระบบ">⎋</button>
+      </div>
+    </div>
+    <nav class="tabs">
+      <button class="active" data-view="overview">ภาพรวม</button>
+      <button data-view="expense">รายรับ-รายจ่าย</button>
+      <button data-view="invest">พอร์ตลงทุน</button>
+    </nav>
+  </div>
+</header>
+
+<main id="appMain" style="display:none;">
+
+  <!-- ===================== OVERVIEW ===================== -->
+  <section class="view active" id="view-overview">
+    <div class="hero-card">
+      <p class="hero-label">สินทรัพย์สุทธิ (Net Worth)</p>
+      <p class="hero-number tabular" id="netWorth">฿0.00</p>
+      <div class="hero-sub">
+        <div class="item">รายรับเดือนนี้<b class="up tabular" id="mIncome">+฿0</b></div>
+        <div class="item">รายจ่ายเดือนนี้<b class="down tabular" id="mExpense">-฿0</b></div>
+        <div class="item">คงเหลือสุทธิเดือนนี้<b class="tabular" id="mNet">฿0</b></div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <h3>สัดส่วนสินทรัพย์</h3>
+        <canvas id="donutChart" height="220"></canvas>
+        <div class="legend" id="donutLegend"></div>
+      </div>
+      <div class="panel">
+        <h3>รายรับ-รายจ่าย 6 เดือนล่าสุด</h3>
+        <canvas id="barChart" height="220"></canvas>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== EXPENSE ===================== -->
+  <section class="view" id="view-expense">
+    <div class="budget-bar">
+      <div class="budget-top">
+        <span>งบใช้จ่ายเดือนนี้</span>
+        <span><b id="budgetSpent">฿0</b> / ฿25,000</span>
+      </div>
+      <div class="budget-track"><div class="budget-fill" id="budgetFill" style="width:0%"></div></div>
+    </div>
+
+    <p class="section-label">รายการล่าสุด</p>
+    <div class="tx-list" id="txList"></div>
+  </section>
+
+  <!-- ===================== INVEST ===================== -->
+  <section class="view" id="view-invest">
+    <div class="row-between">
+      <p class="section-label" style="margin:0;">พอร์ตการลงทุน</p>
+      <button class="btn-ghost" id="openDca">+ บันทึก DCA</button>
+    </div>
+
+    <div class="panel" style="margin-bottom:18px;">
+      <h3>สัดส่วนสินทรัพย์ vs เป้าหมาย</h3>
+      <div id="allocRows"></div>
+      <p class="rebalance-note" id="rebalanceNote"></p>
+    </div>
+
+    <div class="ratio-row" id="ratioRow"></div>
+
+    <div class="asset-group">
+      <h3>หุ้นไทย (เน้นปันผล)</h3>
+      <div id="grp-thai"></div>
+    </div>
+    <div class="asset-group">
+      <h3>ETF ต่างประเทศ</h3>
+      <div id="grp-etf"></div>
+    </div>
+    <div class="asset-group">
+      <h3>กองทุนลดหย่อนภาษี (SSF / RMF)</h3>
+      <div id="grp-ssf"></div>
+    </div>
+    <div class="asset-group">
+      <h3>ทองคำ / สินทรัพย์ทางเลือก</h3>
+      <div id="grp-gold"></div>
+    </div>
+    <div class="asset-group">
+      <h3>บัญชีเทรด</h3>
+      <div id="grp-trade"></div>
+    </div>
+  </section>
+
+  <p class="note-mock">ข้อมูลทั้งหมดในหน้านี้เป็นข้อมูลจำลอง (mock data) สำหรับตรวจสอบหน้าตาและการใช้งาน ยังไม่ได้เชื่อมต่อฐานข้อมูลจริง</p>
+</main>
+
+<button class="fab" id="fabAdd" title="บันทึกรายการ" style="display:none;">+</button>
+
+<!-- Quick add sheet -->
+<div class="sheet-backdrop" id="sheetBackdrop">
+  <div class="sheet">
+    <h2>บันทึกรายการ</h2>
+    <div class="toggle-row">
+      <button class="sel" id="typeExpense" type="button">รายจ่าย</button>
+      <button id="typeIncome" type="button">รายรับ</button>
+    </div>
+    <label>จำนวนเงิน (บาท)</label>
+    <input class="amt-input tabular" id="txAmount" type="number" inputmode="decimal" placeholder="0.00">
+    <label>หมวดหมู่</label>
+    <select id="txCategory"></select>
+    <label>กระเป๋าเงิน</label>
+    <select id="txWallet"></select>
+    <label>บันทึกช่วยจำ</label>
+    <input id="txNote" type="text" placeholder="เช่น กะเพราไก่ไข่ดาว">
+    <label>วันที่</label>
+    <input id="txDate" type="date">
+    <div class="sheet-actions">
+      <button class="btn-secondary" id="cancelTx" type="button">ยกเลิก</button>
+      <button class="btn-primary" id="saveTx" type="button">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- DCA sheet -->
+<div class="sheet-backdrop" id="dcaBackdrop">
+  <div class="sheet">
+    <h2>บันทึกการลงทุน (DCA)</h2>
+    <label>สินทรัพย์</label>
+    <select id="dcaAsset"></select>
+    <label>การทำรายการ</label>
+    <div class="toggle-row">
+      <button class="sel" id="actBuy" type="button">ซื้อ</button>
+      <button id="actSell" type="button">ขาย</button>
+    </div>
+    <label>จำนวนเงิน (บาท)</label>
+    <input class="amt-input tabular" id="dcaAmount" type="number" inputmode="decimal" placeholder="0.00">
+    <label>จำนวนหน่วย</label>
+    <input id="dcaUnits" type="number" inputmode="decimal" placeholder="0.0000">
+    <label>วันที่</label>
+    <input id="dcaDate" type="date">
+    <label>หักเงินจากกระเป๋า (เฉพาะตอนซื้อ — จะบันทึกโอนออกให้อัตโนมัติ)</label>
+    <select id="dcaWallet"></select>
+    <div class="sheet-actions">
+      <button class="btn-secondary" id="cancelDca" type="button">ยกเลิก</button>
+      <button class="btn-primary" id="saveDca" type="button">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- Manage wallets & categories -->
+<div class="sheet-backdrop" id="manageBackdrop">
+  <div class="sheet">
+    <h2>จัดการกระเป๋า & หมวดหมู่</h2>
+    <div class="toggle-row">
+      <button class="sel" id="manageWalletsBtn" type="button">กระเป๋าเงิน</button>
+      <button id="manageCatsBtn" type="button">หมวดหมู่</button>
+    </div>
+
+    <div id="manageWalletsPane">
+      <div class="manage-list" id="walletManageList"></div>
+      <div class="add-row">
+        <input id="newWalletIcon" placeholder="🏷️" maxlength="2">
+        <input id="newWalletName" placeholder="ชื่อกระเป๋า เช่น SCB">
+        <button class="btn-ghost" id="addWalletBtn" type="button">+ เพิ่ม</button>
+      </div>
+    </div>
+
+    <div id="manageCatsPane" style="display:none">
+      <div class="toggle-row" style="margin-bottom:12px;">
+        <button class="sel" id="catTypeExpenseBtn" type="button">รายจ่าย</button>
+        <button id="catTypeIncomeBtn" type="button">รายรับ</button>
+      </div>
+      <div class="manage-list" id="catManageList"></div>
+      <div class="add-row">
+        <input id="newCatIcon" placeholder="🏷️" maxlength="2">
+        <input id="newCatName" placeholder="ชื่อหมวดหมู่">
+        <button class="btn-ghost" id="addCatBtn" type="button">+ เพิ่ม</button>
+      </div>
+    </div>
+
+    <div class="sheet-actions">
+      <button class="btn-primary" id="closeManage" type="button">เสร็จสิ้น</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============ SUPABASE CLIENT ============ */
+const SUPABASE_URL = 'https://wxsfrduxlrlrlqlmdigr.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind4c2ZyZHV4bHJscmxxbG1kaWdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAzMzI0MzUsImV4cCI6MjEwNTkwODQzNX0.Qf1Lm2__-buuwSOMKKn-AUH-T_cc1175utFgAAMGFa0';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+/* ============ STATE (populated from Supabase after login) ============ */
+let wallets = [];
+let categories = [];
+let transactions = [];
+let assets = { thai:[], etf:[], ssf:[], gold:[] };
+let brokerAccounts = [];
+let allocTargets = [
+  { key:'growth',    name:'สินทรัพย์เติบโต (Growth)',      sub:'หุ้นไทยปันผล + ETF ต่างประเทศ',         min:50, max:60, color:'#C9971F' },
+  { key:'defensive', name:'สินทรัพย์ปลอดภัย (Defensive)',   sub:'RMF ตราสารหนี้ + เงินสดส่วนลงทุน',       min:30, max:40, color:'#6E8F7F' },
+  { key:'alt',       name:'สินทรัพย์ทางเลือก (Alternative)', sub:'ทองคำ',                                  min:8,  max:12, color:'#B23B3B' },
+];
+let ratioInputs = { workIncomeMonthly:0, assetIncomeMonthly:0 };
+const GROUP_TO_KEY = { thai_stock:'thai', foreign_etf:'etf', ssf_rmf:'ssf', gold:'gold' };
+const KEY_TO_GROUP = { thai:'thai_stock', etf:'foreign_etf', ssf:'ssf_rmf', gold:'gold' };
+
+/* ============ HELPERS ============ */
+const thb = n => (n<0?'-':'') + '฿' + Math.abs(n).toLocaleString('th-TH',{minimumFractionDigits:2, maximumFractionDigits:2});
+const catById = id => categories.find(c=>c.id===id);
+const walletById = id => wallets.find(w=>w.id===id);
+const todayStr = () => new Date().toISOString().slice(0,10);
+const flatAssets = () => [...assets.thai, ...assets.etf, ...assets.ssf, ...assets.gold];
+
+function computeNetWorth(){
+  const cash = wallets.reduce((s,w)=>s+Number(w.balance||0),0);
+  const thai = assets.thai.reduce((s,a)=>s+a.units*a.price,0);
+  const etf  = assets.etf.reduce((s,a)=>s+a.units*a.price,0);
+  const ssf  = assets.ssf.reduce((s,a)=>s+a.units*a.price,0);
+  const gold = assets.gold.reduce((s,a)=>s+a.units*a.price,0);
+  const trade = brokerAccounts.reduce((s,a)=>s+Number(a.balance||0),0);
+  return { cash, thai, etf, ssf, gold, trade, total: cash+thai+etf+ssf+gold+trade };
+}
+
+function computeMonthly(){
+  const thaiMonths = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const now = new Date();
+  const labels=[], income=[], expense=[];
+  for(let i=5;i>=0;i--){
+    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    const ym = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    labels.push(thaiMonths[d.getMonth()]);
+    const monthTx = transactions.filter(t=>t.type!=='transfer' && t.date.startsWith(ym));
+    income.push(monthTx.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0));
+    expense.push(monthTx.filter(t=>t.type==='expense').reduce((s,t)=>s+Math.abs(t.amount),0));
+  }
+  return { labels, income, expense };
+}
+
+/* ============ AUTH ============ */
+const loginScreen = document.getElementById('loginScreen');
+const appMain = document.getElementById('appMain');
+
+async function checkSession(){
+  const { data } = await sb.auth.getSession();
+  if(data.session){ await enterApp(); } else { showLogin(); }
+}
+function showLogin(){
+  loginScreen.classList.remove('hide');
+  appMain.style.display='none';
+  document.getElementById('fabAdd').style.display='none';
+}
+async function enterApp(){
+  loginScreen.classList.add('hide');
+  appMain.style.display='';
+  document.getElementById('fabAdd').style.display='';
+  await loadAllData();
+  await ensureDefaults();
+  renderOverview();
+  renderExpense();
+  renderInvest();
+}
+
+document.getElementById('loginBtn').addEventListener('click', async ()=>{
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+  errEl.textContent = '';
+  if(!email || !password){ errEl.textContent='กรอกอีเมลและรหัสผ่านให้ครบ'; return; }
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if(error){ errEl.textContent = 'เข้าสู่ระบบไม่สำเร็จ: ' + error.message; return; }
+  await enterApp();
+});
+document.getElementById('logoutBtn').addEventListener('click', async ()=>{
+  await sb.auth.signOut();
+  showLogin();
+});
+
+/* ============ DATA LOADING ============ */
+async function loadAllData(){
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth()-6);
+  const sixMonthsAgoStr = sixMonthsAgo.toISOString().slice(0,10);
+
+  const [wRes, cRes, tRes, aRes, bRes, atRes, riRes] = await Promise.all([
+    sb.from('wallets').select('*').eq('archived', false).order('created_at'),
+    sb.from('categories').select('*').eq('archived', false).order('created_at'),
+    sb.from('transactions').select('*').gte('date', sixMonthsAgoStr).order('date', { ascending:false }).limit(2000),
+    sb.from('assets').select('*').eq('archived', false).order('created_at'),
+    sb.from('broker_accounts').select('*').order('created_at'),
+    sb.from('allocation_targets').select('*'),
+    sb.from('ratio_inputs').select('*').maybeSingle(),
+  ]);
+
+  wallets = wRes.data || [];
+  categories = cRes.data || [];
+  transactions = (tRes.data || []).map(t=>({
+    id:t.id, date:t.date, type:t.type, amount:Number(t.amount),
+    catId:t.category_id, walletId:t.wallet_id, toWalletId:t.to_wallet_id, note:t.note,
+  }));
+
+  assets = { thai:[], etf:[], ssf:[], gold:[] };
+  (aRes.data||[]).forEach(a=>{
+    const key = GROUP_TO_KEY[a.group_type];
+    if(!key) return;
+    assets[key].push({
+      id:a.id, name:a.name, sub:a.sub,
+      units:Number(a.units), avgCost:Number(a.avg_cost), price:Number(a.current_price),
+      divYield: a.dividend_yield!=null ? Number(a.dividend_yield) : null,
+    });
+  });
+
+  brokerAccounts = (bRes.data||[]).map(b=>({
+    id:b.id, name:b.name, sub:b.sub, balance:Number(b.balance), plPct: b.pl_pct!=null?Number(b.pl_pct):0,
+  }));
+
+  if(atRes.data && atRes.data.length){
+    allocTargets = allocTargets.map(def=>{
+      const row = atRes.data.find(r=>r.bucket_key===def.key);
+      return row ? { key:def.key, name:row.name, sub:row.sub, min:Number(row.min_pct), max:Number(row.max_pct), color:row.color||def.color } : def;
+    });
+  }
+
+  if(riRes.data){
+    ratioInputs = {
+      workIncomeMonthly: Number(riRes.data.work_income_monthly),
+      assetIncomeMonthly: Number(riRes.data.asset_income_monthly),
+    };
+  }
+}
+
+async function ensureDefaults(){
+  let reloadNeeded = false;
+
+  if(wallets.length===0){
+    await sb.from('wallets').insert([
+      { name:'เงินสด', icon:'💵', balance:0 },
+      { name:'K+ กสิกร', icon:'🟢', balance:0 },
+      { name:'True Wallet', icon:'🟠', balance:0 },
+    ]);
+    reloadNeeded = true;
+  }
+
+  if(categories.length===0){
+    await sb.from('categories').insert([
+      { name:'อาหาร & เครื่องดื่ม', type:'expense', icon:'🍜' },
+      { name:'การเดินทาง/เติมน้ำมัน', type:'expense', icon:'⛽' },
+      { name:'ช้อปปิ้ง ของใช้', type:'expense', icon:'🛍️' },
+      { name:'บิล & สาธารณูปโภค', type:'expense', icon:'💡' },
+      { name:'บันเทิง', type:'expense', icon:'🎬' },
+      { name:'สุขภาพ & ฟิตเนส', type:'expense', icon:'💊' },
+      { name:'หอพัก/ค่าเช่า', type:'expense', icon:'🏠' },
+      { name:'เงินเดือน', type:'income', icon:'💼' },
+      { name:'part-time', type:'income', icon:'🩺' },
+      { name:'รายได้อื่นๆ', type:'income', icon:'✨' },
+    ]);
+    reloadNeeded = true;
+  }
+
+  const { count: atCount } = await sb.from('allocation_targets').select('*', { count:'exact', head:true });
+  if(!atCount){
+    await sb.from('allocation_targets').insert([
+      { bucket_key:'growth', name:'สินทรัพย์เติบโต (Growth)', sub:'หุ้นไทยปันผล + ETF ต่างประเทศ', min_pct:50, max_pct:60, color:'#C9971F' },
+      { bucket_key:'defensive', name:'สินทรัพย์ปลอดภัย (Defensive)', sub:'RMF ตราสารหนี้ + เงินสดส่วนลงทุน', min_pct:30, max_pct:40, color:'#6E8F7F' },
+      { bucket_key:'alt', name:'สินทรัพย์ทางเลือก (Alternative)', sub:'ทองคำ', min_pct:8, max_pct:12, color:'#B23B3B' },
+    ]);
+    reloadNeeded = true;
+  }
+
+  const { count: riCount } = await sb.from('ratio_inputs').select('*', { count:'exact', head:true });
+  if(!riCount){
+    await sb.from('ratio_inputs').insert([{ work_income_monthly:0, asset_income_monthly:0 }]);
+    reloadNeeded = true;
+  }
+
+  if(reloadNeeded){ await loadAllData(); }
+}
+
+async function refreshAll(){
+  await loadAllData();
+  renderOverview();
+  renderExpense();
+  renderInvest();
+  fillSelects();
+}
+
+/* ============ RENDER: OVERVIEW ============ */
+let donutChartInstance, barChartInstance;
+function renderOverview(){
+  const nw = computeNetWorth();
+  document.getElementById('netWorth').textContent = thb(nw.total);
+
+  const ym = todayStr().slice(0,7);
+  const thisMonth = transactions.filter(t=>t.type!=='transfer' && t.date.startsWith(ym));
+  const inc = thisMonth.filter(t=>t.amount>0).reduce((s,t)=>s+t.amount,0);
+  const exp = thisMonth.filter(t=>t.amount<0).reduce((s,t)=>s+t.amount,0);
+  document.getElementById('mIncome').textContent = '+'+thb(inc);
+  document.getElementById('mExpense').textContent = thb(exp);
+  document.getElementById('mNet').textContent = thb(inc+exp);
+
+  const donutData = [nw.cash, nw.thai+nw.etf, nw.ssf, nw.gold, nw.trade];
+  const donutLabels = ['เงินสด/ธนาคาร','หุ้นไทย+ETF','SSF/RMF','ทองคำ','บัญชีเทรด'];
+  const donutColors = ['#C9971F','#2F7D53','#6E8F7F','#D9B43C','#B23B3B'];
+
+  if(donutChartInstance) donutChartInstance.destroy();
+  donutChartInstance = new Chart(document.getElementById('donutChart'), {
+    type:'doughnut',
+    data:{ labels:donutLabels, datasets:[{ data:donutData, backgroundColor:donutColors, borderWidth:0 }] },
+    options:{ plugins:{ legend:{ display:false } }, cutout:'68%' }
+  });
+  document.getElementById('donutLegend').innerHTML = donutLabels.map((l,i)=>
+    `<span><span class="dot" style="background:${donutColors[i]}"></span>${l}</span>`).join('');
+
+  const monthly = computeMonthly();
+  if(barChartInstance) barChartInstance.destroy();
+  barChartInstance = new Chart(document.getElementById('barChart'), {
+    type:'bar',
+    data:{ labels:monthly.labels, datasets:[
+      { label:'รายรับ', data:monthly.income, backgroundColor:'#2F7D53', borderRadius:6 },
+      { label:'รายจ่าย', data:monthly.expense, backgroundColor:'#B23B3B', borderRadius:6 },
+    ]},
+    options:{ plugins:{ legend:{ position:'bottom', labels:{ color:getComputedStyle(document.body).getPropertyValue('--text-soft'), boxWidth:10 } } },
+      scales:{ x:{ grid:{ display:false } }, y:{ grid:{ color:'rgba(128,128,128,0.15)' } } } }
+  });
+}
+
+/* ============ RENDER: EXPENSE ============ */
+function renderExpense(){
+  const list = document.getElementById('txList');
+  const items = transactions.filter(t=>t.type!=='transfer').slice().sort((a,b)=>b.date.localeCompare(a.date));
+  list.innerHTML = items.length ? items.map(t=>{
+    const c = catById(t.catId) || { icon:'🏷️', name:'(ไม่ระบุหมวดหมู่)' };
+    const w = walletById(t.walletId) || { name:'(ไม่ระบุกระเป๋า)' };
+    return `<div class="tx-row">
+      <div class="tx-icon">${c.icon}</div>
+      <div class="tx-mid">
+        <div class="tx-title">${t.note || c.name}</div>
+        <div class="tx-meta">${c.name} · ${w.name} · ${t.date}</div>
+      </div>
+      <div class="tx-amt ${t.amount<0?'down':'up'} tabular">${t.amount<0?'':'+'}${thb(t.amount)}</div>
+    </div>`;
+  }).join('') : `<p style="color:var(--text-soft); font-size:13.5px; padding:16px 2px;">ยังไม่มีรายการ — กดปุ่ม + เพื่อเริ่มบันทึก</p>`;
+
+  const ym = todayStr().slice(0,7);
+  const spent = transactions.filter(t=>t.type==='expense' && t.date.startsWith(ym))
+    .reduce((s,t)=>s+Math.abs(t.amount),0);
+  document.getElementById('budgetSpent').textContent = thb(spent);
+  document.getElementById('budgetFill').style.width = Math.min(100, spent/25000*100)+'%';
+}
+
+/* ============ RENDER: INVEST ============ */
+function assetCard(a, isTrade){
+  if(isTrade){
+    const pl = a.plPct;
+    return `<div class="asset-card">
+      <div><div class="asset-name">${a.name}</div><div class="asset-sub">${a.sub||''}</div></div>
+      <div><div class="asset-value tabular">${thb(a.balance)}</div>
+        <div class="asset-pl ${pl<0?'down':'up'} tabular">${pl<0?'':'+'}${pl.toFixed(1)}%</div></div>
+    </div>`;
+  }
+  const value = a.units*a.price;
+  const cost = a.units*a.avgCost;
+  const pl = value-cost, plPct = cost>0 ? (pl/cost*100) : 0;
+  const divBadge = a.divYield ? `<span class="div-badge">ปันผล ~${a.divYield.toFixed(1)}%/ปี</span>` : '';
+  return `<div class="asset-card">
+    <div><div class="asset-name">${a.name}</div>
+      <div class="asset-sub">${a.sub||''} · ${a.units.toLocaleString('th-TH')} หน่วย · ต้นทุนเฉลี่ย ${a.avgCost.toFixed(2)}</div>
+      ${divBadge}</div>
+    <div><div class="asset-value tabular">${thb(value)}</div>
+      <div class="asset-pl ${pl<0?'down':'up'} tabular">${pl<0?'':'+'}${thb(pl)} (${pl<0?'':'+'}${plPct.toFixed(1)}%)</div></div>
+  </div>`;
+}
+
+function renderAllocation(){
+  const nw = computeNetWorth();
+  const investableCash = Math.max(nw.cash - 20000, 0); // ~เงินสดสำรองใช้จ่าย ไม่นับเป็นเงินลงทุน
+  const coreTotal = nw.thai + nw.etf + nw.ssf + nw.gold + investableCash;
+  const buckets = {
+    growth: nw.thai + nw.etf,
+    defensive: nw.ssf + investableCash,
+    alt: nw.gold,
+  };
+  document.getElementById('allocRows').innerHTML = allocTargets.map(t=>{
+    const pct = coreTotal>0 ? (buckets[t.key]/coreTotal*100) : 0;
+    const inRange = pct>=t.min && pct<=t.max;
+    return `<div class="alloc-row">
+      <div class="alloc-top">
+        <span><span class="an">${t.name}</span> <span class="as">· ${t.sub}</span></span>
+        <span class="av tabular" style="color:${inRange?'var(--jade)':'var(--maroon)'}">${pct.toFixed(1)}%</span>
+      </div>
+      <div class="alloc-track">
+        <div class="alloc-fill" style="width:${Math.min(pct,100)}%; background:${t.color}"></div>
+        <div class="alloc-target-mark" style="left:${t.min}%"></div>
+        <div class="alloc-target-mark" style="left:${t.max}%"></div>
+      </div>
+      <div class="alloc-sub">เป้าหมาย ${t.min}–${t.max}%${coreTotal===0?'':(inRange?' · อยู่ในกรอบ':' · นอกกรอบ ควรพิจารณา rebalance')}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('rebalanceNote').textContent = 'แผน rebalance: ทบทวนสัดส่วน 2 ครั้ง/ปี (เส้นขีดบนแถบคือกรอบเป้าหมาย)';
+}
+
+function renderRatios(){
+  const ym = todayStr().slice(0,7);
+  const expenseMonthly = Math.abs(transactions.filter(t=>t.type==='expense' && t.date.startsWith(ym)).reduce((s,t)=>s+t.amount,0)) || 1;
+  const survival = (ratioInputs.workIncomeMonthly + ratioInputs.assetIncomeMonthly) / expenseMonthly;
+  const wealth = ratioInputs.assetIncomeMonthly / expenseMonthly;
+  const card = (label, val, hint) => `<div class="ratio-card">
+      <div class="rl">${label}</div>
+      <div class="rv tabular" style="color:${val>=1?'var(--jade)':'var(--text)'}">${val.toFixed(2)}</div>
+      <div class="rt" style="color:${val>=1?'var(--jade)':'var(--text-soft)'}">${hint}</div>
+    </div>`;
+  document.getElementById('ratioRow').innerHTML =
+    card('Survival Ratio', survival, survival>=1?'อยู่รอดได้ด้วยรายได้รวม ✓':'เป้าหมาย > 1.00') +
+    card('Wealth Ratio (อิสรภาพทางการเงิน)', wealth, wealth>=1?'สินทรัพย์เลี้ยงรายจ่ายได้แล้ว ✓':'เป้าหมาย > 1.00 = สินทรัพย์เลี้ยงรายจ่ายได้เอง');
+}
+
+function renderInvest(){
+  renderAllocation();
+  renderRatios();
+  document.getElementById('grp-thai').innerHTML = assets.thai.length ? assets.thai.map(a=>assetCard(a,false)).join('') : `<p style="color:var(--text-soft); font-size:13px;">ยังไม่มีรายการ</p>`;
+  document.getElementById('grp-etf').innerHTML = assets.etf.length ? assets.etf.map(a=>assetCard(a,false)).join('') : `<p style="color:var(--text-soft); font-size:13px;">ยังไม่มีรายการ</p>`;
+  document.getElementById('grp-ssf').innerHTML = assets.ssf.length ? assets.ssf.map(a=>assetCard(a,false)).join('') : `<p style="color:var(--text-soft); font-size:13px;">ยังไม่มีรายการ</p>`;
+  document.getElementById('grp-gold').innerHTML = assets.gold.length ? assets.gold.map(a=>assetCard(a,false)).join('') : `<p style="color:var(--text-soft); font-size:13px;">ยังไม่มีรายการ</p>`;
+  document.getElementById('grp-trade').innerHTML = brokerAccounts.length ? brokerAccounts.map(a=>assetCard(a,true)).join('') : `<p style="color:var(--text-soft); font-size:13px;">ยังไม่มีรายการ</p>`;
+}
+
+/* ============ TAB SWITCHING ============ */
+document.querySelectorAll('nav.tabs button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    document.getElementById('view-'+btn.dataset.view).classList.add('active');
+  });
+});
+
+/* ============ QUICK-ADD SHEET ============ */
+const sheetBackdrop = document.getElementById('sheetBackdrop');
+let txType = 'expense';
+
+function fillSelects(){
+  const catSel = document.getElementById('txCategory');
+  catSel.innerHTML = categories.filter(c=>c.type===txType).map(c=>`<option value="${c.id}">${c.icon} ${c.name}</option>`).join('');
+  const wSel = document.getElementById('txWallet');
+  wSel.innerHTML = wallets.map(w=>`<option value="${w.id}">${w.icon} ${w.name}</option>`).join('');
+  document.getElementById('txDate').value = todayStr();
+}
+document.getElementById('fabAdd').addEventListener('click', ()=>{
+  txType='expense';
+  document.getElementById('typeExpense').classList.add('sel');
+  document.getElementById('typeIncome').classList.remove('sel');
+  fillSelects();
+  sheetBackdrop.classList.add('open');
+});
+document.getElementById('cancelTx').addEventListener('click', ()=>sheetBackdrop.classList.remove('open'));
+sheetBackdrop.addEventListener('click', e=>{ if(e.target===sheetBackdrop) sheetBackdrop.classList.remove('open'); });
+
+document.getElementById('typeExpense').addEventListener('click', ()=>{
+  txType='expense';
+  document.getElementById('typeExpense').classList.add('sel');
+  document.getElementById('typeIncome').classList.remove('sel');
+  fillSelects();
+});
+document.getElementById('typeIncome').addEventListener('click', ()=>{
+  txType='income';
+  document.getElementById('typeIncome').classList.add('sel');
+  document.getElementById('typeExpense').classList.remove('sel');
+  fillSelects();
+});
+
+document.getElementById('saveTx').addEventListener('click', async ()=>{
+  const amt = parseFloat(document.getElementById('txAmount').value);
+  if(!amt) return;
+  const walletId = document.getElementById('txWallet').value;
+  const categoryId = document.getElementById('txCategory').value;
+  const date = document.getElementById('txDate').value || todayStr();
+  const note = document.getElementById('txNote').value;
+  const signedAmount = txType==='expense' ? -Math.abs(amt) : Math.abs(amt);
+
+  const saveBtn = document.getElementById('saveTx');
+  saveBtn.disabled = true;
+  const wallet = wallets.find(w=>w.id===walletId);
+  await sb.from('transactions').insert([{ date, type:txType, amount:signedAmount, wallet_id:walletId, category_id:categoryId, note }]);
+  if(wallet){
+    await sb.from('wallets').update({ balance: Number(wallet.balance)+signedAmount }).eq('id', walletId);
+  }
+  document.getElementById('txAmount').value='';
+  document.getElementById('txNote').value='';
+  sheetBackdrop.classList.remove('open');
+  await refreshAll();
+  saveBtn.disabled = false;
+});
+
+/* ============ DCA SHEET ============ */
+const dcaBackdrop = document.getElementById('dcaBackdrop');
+let dcaAction = 'buy';
+document.getElementById('openDca').addEventListener('click', ()=>{
+  const sel = document.getElementById('dcaAsset');
+  sel.innerHTML = flatAssets().map(a=>`<option value="${a.id}">${a.name}</option>`).join('');
+  const wSel = document.getElementById('dcaWallet');
+  wSel.innerHTML = `<option value="">— ไม่บันทึกโอนออก —</option>` + wallets.map(w=>`<option value="${w.id}">${w.icon} ${w.name}</option>`).join('');
+  document.getElementById('dcaDate').value = todayStr();
+  dcaBackdrop.classList.add('open');
+});
+document.getElementById('cancelDca').addEventListener('click', ()=>dcaBackdrop.classList.remove('open'));
+dcaBackdrop.addEventListener('click', e=>{ if(e.target===dcaBackdrop) dcaBackdrop.classList.remove('open'); });
+document.getElementById('actBuy').addEventListener('click', ()=>{
+  dcaAction='buy';
+  document.getElementById('actBuy').classList.add('sel');
+  document.getElementById('actSell').classList.remove('sel');
+});
+document.getElementById('actSell').addEventListener('click', ()=>{
+  dcaAction='sell';
+  document.getElementById('actSell').classList.add('sel');
+  document.getElementById('actBuy').classList.remove('sel');
+});
+document.getElementById('saveDca').addEventListener('click', async ()=>{
+  const assetId = document.getElementById('dcaAsset').value;
+  const amount = parseFloat(document.getElementById('dcaAmount').value);
+  const units = parseFloat(document.getElementById('dcaUnits').value);
+  const date = document.getElementById('dcaDate').value || todayStr();
+  const fundingWalletId = document.getElementById('dcaWallet').value || null;
+  if(!assetId || !amount || !units) return;
+
+  const saveBtn = document.getElementById('saveDca');
+  saveBtn.disabled = true;
+
+  const asset = flatAssets().find(a=>a.id===assetId);
+  const pricePerUnit = amount/units;
+  let newUnits, newAvgCost;
+  if(dcaAction==='buy'){
+    newUnits = asset.units + units;
+    newAvgCost = newUnits>0 ? ((asset.units*asset.avgCost)+amount)/newUnits : asset.avgCost;
+  } else {
+    newUnits = Math.max(asset.units - units, 0);
+    newAvgCost = asset.avgCost;
+  }
+
+  await sb.from('investment_transactions').insert([{
+    asset_id:assetId, date, action:dcaAction, amount_thb:amount, units, price_per_unit:pricePerUnit,
+    funding_wallet_id: dcaAction==='buy' ? fundingWalletId : null,
+  }]);
+  await sb.from('assets').update({ units:newUnits, avg_cost:newAvgCost, updated_at:new Date().toISOString() }).eq('id', assetId);
+
+  if(dcaAction==='buy' && fundingWalletId){
+    const fw = wallets.find(w=>w.id===fundingWalletId);
+    if(fw){
+      await sb.from('transactions').insert([{ date, type:'transfer', amount, wallet_id:fundingWalletId, note:'DCA ซื้อ '+asset.name }]);
+      await sb.from('wallets').update({ balance: Number(fw.balance)-amount }).eq('id', fundingWalletId);
+    }
+  }
+
+  dcaBackdrop.classList.remove('open');
+  document.getElementById('dcaAmount').value='';
+  document.getElementById('dcaUnits').value='';
+  await refreshAll();
+  saveBtn.disabled = false;
+});
+
+/* ============ MANAGE WALLETS & CATEGORIES ============ */
+const manageBackdrop = document.getElementById('manageBackdrop');
+let manageCatType = 'expense';
+
+function renderManageWallets(){
+  document.getElementById('walletManageList').innerHTML = wallets.map(w=>`
+    <div class="manage-row">
+      <span class="mi">${w.icon}</span>
+      <span class="mn">${w.name}</span>
+      <button class="mx" data-id="${w.id}" type="button">×</button>
+    </div>`).join('');
+}
+function renderManageCats(){
+  document.getElementById('catManageList').innerHTML = categories.filter(c=>c.type===manageCatType).map(c=>`
+    <div class="manage-row">
+      <span class="mi">${c.icon}</span>
+      <span class="mn">${c.name}</span>
+      <button class="mx" data-id="${c.id}" type="button">×</button>
+    </div>`).join('');
+}
+
+document.getElementById('openManage').addEventListener('click', ()=>{
+  renderManageWallets();
+  manageBackdrop.classList.add('open');
+});
+document.getElementById('closeManage').addEventListener('click', ()=>manageBackdrop.classList.remove('open'));
+manageBackdrop.addEventListener('click', e=>{ if(e.target===manageBackdrop) manageBackdrop.classList.remove('open'); });
+
+document.getElementById('manageWalletsBtn').addEventListener('click', ()=>{
+  document.getElementById('manageWalletsBtn').classList.add('sel');
+  document.getElementById('manageCatsBtn').classList.remove('sel');
+  document.getElementById('manageWalletsPane').style.display='';
+  document.getElementById('manageCatsPane').style.display='none';
+});
+document.getElementById('manageCatsBtn').addEventListener('click', ()=>{
+  document.getElementById('manageCatsBtn').classList.add('sel');
+  document.getElementById('manageWalletsBtn').classList.remove('sel');
+  document.getElementById('manageCatsPane').style.display='';
+  document.getElementById('manageWalletsPane').style.display='none';
+  renderManageCats();
+});
+document.getElementById('catTypeExpenseBtn').addEventListener('click', ()=>{
+  manageCatType='expense';
+  document.getElementById('catTypeExpenseBtn').classList.add('sel');
+  document.getElementById('catTypeIncomeBtn').classList.remove('sel');
+  renderManageCats();
+});
+document.getElementById('catTypeIncomeBtn').addEventListener('click', ()=>{
+  manageCatType='income';
+  document.getElementById('catTypeIncomeBtn').classList.add('sel');
+  document.getElementById('catTypeExpenseBtn').classList.remove('sel');
+  renderManageCats();
+});
+
+document.getElementById('walletManageList').addEventListener('click', async e=>{
+  const id = e.target.dataset.id;
+  if(!id) return;
+  if(!confirm('ลบกระเป๋านี้ใช่ไหม? รายการเก่าที่เคยผูกไว้จะยังอยู่ แต่จะไม่ระบุกระเป๋า')) return;
+  await sb.from('wallets').delete().eq('id', id);
+  await refreshAll();
+  renderManageWallets();
+});
+document.getElementById('catManageList').addEventListener('click', async e=>{
+  const id = e.target.dataset.id;
+  if(!id) return;
+  if(!confirm('ลบหมวดหมู่นี้ใช่ไหม? รายการเก่าที่เคยผูกไว้จะยังอยู่ แต่จะไม่ระบุหมวดหมู่')) return;
+  await sb.from('categories').delete().eq('id', id);
+  await refreshAll();
+  renderManageCats();
+});
+
+document.getElementById('addWalletBtn').addEventListener('click', async ()=>{
+  const name = document.getElementById('newWalletName').value.trim();
+  if(!name) return;
+  const icon = document.getElementById('newWalletIcon').value.trim() || '💳';
+  await sb.from('wallets').insert([{ name, icon, balance:0 }]);
+  document.getElementById('newWalletIcon').value='';
+  document.getElementById('newWalletName').value='';
+  await refreshAll();
+  renderManageWallets();
+});
+document.getElementById('addCatBtn').addEventListener('click', async ()=>{
+  const name = document.getElementById('newCatName').value.trim();
+  if(!name) return;
+  const icon = document.getElementById('newCatIcon').value.trim() || '🏷️';
+  await sb.from('categories').insert([{ name, type:manageCatType, icon }]);
+  document.getElementById('newCatIcon').value='';
+  document.getElementById('newCatName').value='';
+  await refreshAll();
+  renderManageCats();
+});
+
+/* ============ INIT ============ */
+checkSession();
+
+</script>
+</body>
+</html>
