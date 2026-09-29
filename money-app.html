@@ -9,6 +9,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
   :root{
     --ink:#15181D;
@@ -94,12 +96,12 @@
   .brand .sub{ font-family:var(--sans); font-size:12.5px; color:#B9BFCE; }
   nav.tabs{
     display:flex; gap:6px; background:rgba(255,255,255,0.06);
-    padding:4px; border-radius:999px;
+    padding:4px; border-radius:999px; overflow-x:auto;
   }
   nav.tabs button{
     flex:1; border:none; background:transparent; color:#C9CFDA;
-    font-family:var(--sans); font-weight:600; font-size:14px;
-    padding:9px 10px; border-radius:999px; cursor:pointer;
+    font-family:var(--sans); font-weight:600; font-size:13px;
+    padding:9px 8px; border-radius:999px; cursor:pointer; white-space:nowrap;
     transition: background .18s ease, color .18s ease;
   }
   nav.tabs button.active{
@@ -156,7 +158,9 @@
   .tx-row{
     display:flex; align-items:center; gap:12px;
     padding:12px 2px; border-bottom:1px solid var(--line);
+    cursor:pointer;
   }
+  .tx-row:active{ background:var(--paper-2); }
   .tx-icon{
     width:38px; height:38px; border-radius:11px; background:var(--paper-2);
     display:flex; align-items:center; justify-content:center; font-size:18px; flex:none;
@@ -186,6 +190,15 @@
   .alloc-target-mark{ position:absolute; top:-2px; width:2px; height:11px; background:var(--text); opacity:.5; }
   .alloc-sub{ font-size:11.5px; color:var(--text-soft); margin-top:4px; }
   .rebalance-note{ font-size:12px; color:var(--text-soft); margin:14px 0 0; padding-top:12px; border-top:1px solid var(--line); }
+  .period-nav{ display:flex; align-items:center; justify-content:center; gap:18px; }
+  .period-nav .btn-ghost{ padding:6px 14px; font-size:16px; }
+  .period-label{ font-family:var(--serif); font-size:17px; font-weight:600; min-width:140px; text-align:center; }
+  .breakdown-row{ margin-bottom:10px; }
+  .breakdown-top{ display:flex; justify-content:space-between; font-size:13px; margin-bottom:4px; }
+  .breakdown-track{ height:6px; border-radius:999px; background:var(--paper-3); overflow:hidden; }
+  .breakdown-fill{ height:100%; background:var(--gold); border-radius:999px; }
+  .export-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:6px; }
+  .export-grid .btn-ghost{ padding:12px; font-size:13.5px; }
   .ratio-row{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px; }
   .ratio-card{ background:var(--paper-2); border:1px solid var(--line); border-radius:14px; padding:14px 16px; }
   .ratio-card .rl{ font-size:12px; color:var(--text-soft); margin-bottom:6px; }
@@ -270,6 +283,11 @@
     background:transparent; border:1px solid var(--line); color:var(--text-soft);
     border-radius:12px; padding:13px 16px; font-family:var(--sans); font-weight:600; cursor:pointer;
   }
+  .btn-delete-tx{
+    width:100%; margin-top:12px; background:transparent; border:none;
+    color:var(--maroon); font-family:var(--sans); font-weight:600; font-size:13.5px;
+    padding:10px; cursor:pointer;
+  }
   .brand-row{ display:flex; align-items:center; justify-content:space-between; }
   .icon-btn{
     background:rgba(255,255,255,0.08); border:none; color:#F1ECDD;
@@ -329,6 +347,7 @@
       <button class="active" data-view="overview">ภาพรวม</button>
       <button data-view="expense">รายรับ-รายจ่าย</button>
       <button data-view="invest">พอร์ตลงทุน</button>
+      <button data-view="reports">สรุป & ส่งออก</button>
     </nav>
   </div>
 </header>
@@ -370,7 +389,16 @@
       <div class="budget-track"><div class="budget-fill" id="budgetFill" style="width:0%"></div></div>
     </div>
 
-    <p class="section-label">รายการล่าสุด</p>
+    <div class="row-between" style="margin-bottom:8px;">
+      <p class="section-label" style="margin:0;">ประวัติรายการ (แตะเพื่อแก้ไข)</p>
+      <select id="historyRange" style="width:auto; padding:6px 10px; font-size:12.5px;">
+        <option value="month">เดือนนี้</option>
+        <option value="lastMonth">เดือนก่อน</option>
+        <option value="3months">3 เดือนล่าสุด</option>
+        <option value="year">ปีนี้</option>
+        <option value="all">ทั้งหมด</option>
+      </select>
+    </div>
     <div class="tx-list" id="txList"></div>
   </section>
 
@@ -411,7 +439,58 @@
     </div>
   </section>
 
-  <p class="note-mock">ข้อมูลทั้งหมดในหน้านี้เป็นข้อมูลจำลอง (mock data) สำหรับตรวจสอบหน้าตาและการใช้งาน ยังไม่ได้เชื่อมต่อฐานข้อมูลจริง</p>
+  <!-- ===================== REPORTS & EXPORT ===================== -->
+  <section class="view" id="view-reports">
+    <div class="panel" style="margin-bottom:18px;">
+      <div class="toggle-row" style="margin-bottom:14px;">
+        <button id="periodDay" type="button">วัน</button>
+        <button id="periodWeek" type="button">สัปดาห์</button>
+        <button class="sel" id="periodMonth" type="button">เดือน</button>
+        <button id="periodYear" type="button">ปี</button>
+      </div>
+      <div class="period-nav">
+        <button class="btn-ghost" id="periodPrev" type="button">‹</button>
+        <span class="period-label" id="periodLabel">—</span>
+        <button class="btn-ghost" id="periodNext" type="button">›</button>
+      </div>
+      <div class="hero-sub" style="margin-top:16px;">
+        <div class="item">รายรับ<b class="up tabular" id="repIncome">+฿0</b></div>
+        <div class="item">รายจ่าย<b class="down tabular" id="repExpense">-฿0</b></div>
+        <div class="item">คงเหลือ<b class="tabular" id="repNet">฿0</b></div>
+      </div>
+      <p class="section-label" style="margin:20px 0 8px;">แยกตามหมวดหมู่ (มากไปน้อย)</p>
+      <div id="repBreakdown"></div>
+    </div>
+
+    <div class="panel">
+      <h3>ส่งออกข้อมูล</h3>
+      <label>ช่วงเวลา</label>
+      <select id="exportRange">
+        <option value="month">เดือนนี้</option>
+        <option value="lastMonth">เดือนก่อน</option>
+        <option value="year">ปีนี้</option>
+        <option value="lastYear">ปีก่อน</option>
+        <option value="custom">กำหนดเอง</option>
+      </select>
+      <div id="exportCustomRange" style="display:none;">
+        <label>จากวันที่</label>
+        <input id="exportFrom" type="date">
+        <label>ถึงวันที่</label>
+        <input id="exportTo" type="date">
+      </div>
+      <div class="export-grid">
+        <button class="btn-ghost" id="exportCsv" type="button">📄 CSV</button>
+        <button class="btn-ghost" id="exportXlsx" type="button">📊 Excel</button>
+        <button class="btn-ghost" id="exportPdf" type="button">🧾 PDF</button>
+        <button class="btn-ghost" id="exportJson" type="button">🗂️ JSON</button>
+      </div>
+      <div class="rebalance-note" style="margin-top:18px;">
+        <b style="color:var(--text);">สำรองข้อมูลทั้งหมด</b> — ไฟล์ backup เต็มรูปแบบ (กระเป๋า/หมวดหมู่/รายการ/พอร์ตลงทุนทั้งหมด ไม่จำกัดช่วงเวลา) สำหรับกู้คืนในอนาคต
+      </div>
+      <button class="btn-primary" id="exportFullBackup" type="button" style="width:100%; margin-top:12px;">💾 ดาวน์โหลด Backup เต็มรูปแบบ (JSON)</button>
+    </div>
+  </section>
+
 </main>
 
 <button class="fab" id="fabAdd" title="บันทึกรายการ" style="display:none;">+</button>
@@ -419,7 +498,7 @@
 <!-- Quick add sheet -->
 <div class="sheet-backdrop" id="sheetBackdrop">
   <div class="sheet">
-    <h2>บันทึกรายการ</h2>
+    <h2 id="txSheetTitle">บันทึกรายการ</h2>
     <div class="toggle-row">
       <button class="sel" id="typeExpense" type="button">รายจ่าย</button>
       <button id="typeIncome" type="button">รายรับ</button>
@@ -438,6 +517,7 @@
       <button class="btn-secondary" id="cancelTx" type="button">ยกเลิก</button>
       <button class="btn-primary" id="saveTx" type="button">บันทึก</button>
     </div>
+    <button class="btn-delete-tx" id="deleteTx" type="button" style="display:none;">ลบรายการนี้</button>
   </div>
 </div>
 
@@ -613,6 +693,7 @@ async function enterApp(){
   renderOverview();
   renderExpense();
   renderInvest();
+  renderReports();
 }
 
 document.getElementById('loginBtn').addEventListener('click', async ()=>{
@@ -632,14 +713,10 @@ document.getElementById('logoutBtn').addEventListener('click', async ()=>{
 
 /* ============ DATA LOADING ============ */
 async function loadAllData(){
-  const sixMonthsAgo = new Date();
-  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth()-6);
-  const sixMonthsAgoStr = sixMonthsAgo.toISOString().slice(0,10);
-
   const [wRes, cRes, tRes, aRes, bRes, atRes, riRes] = await Promise.all([
     sb.from('wallets').select('*').eq('archived', false).order('created_at'),
     sb.from('categories').select('*').eq('archived', false).order('created_at'),
-    sb.from('transactions').select('*').gte('date', sixMonthsAgoStr).order('date', { ascending:false }).limit(2000),
+    sb.from('transactions').select('*').order('date', { ascending:false }).limit(5000),
     sb.from('assets').select('*').eq('archived', false).order('created_at'),
     sb.from('broker_accounts').select('*').order('created_at'),
     sb.from('allocation_targets').select('*'),
@@ -735,6 +812,7 @@ async function refreshAll(){
   renderOverview();
   renderExpense();
   renderInvest();
+  renderReports();
   fillSelects();
 }
 
@@ -779,13 +857,31 @@ function renderOverview(){
 }
 
 /* ============ RENDER: EXPENSE ============ */
+function rangeBounds(key, anchor){
+  const d = anchor ? new Date(anchor) : new Date();
+  const y = d.getFullYear(), m = d.getMonth();
+  const pad = n => String(n).padStart(2,'0');
+  const fmt = dt => `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}`;
+  if(key==='month'){ return { from: fmt(new Date(y,m,1)), to: fmt(new Date(y,m+1,0)) }; }
+  if(key==='lastMonth'){ return { from: fmt(new Date(y,m-1,1)), to: fmt(new Date(y,m,0)) }; }
+  if(key==='3months'){ return { from: fmt(new Date(y,m-2,1)), to: fmt(new Date(y,m+1,0)) }; }
+  if(key==='year'){ return { from: `${y}-01-01`, to: `${y}-12-31` }; }
+  if(key==='lastYear'){ return { from: `${y-1}-01-01`, to: `${y-1}-12-31` }; }
+  return { from:null, to:null }; // 'all'
+}
+
 function renderExpense(){
   const list = document.getElementById('txList');
-  const items = transactions.filter(t=>t.type!=='transfer').slice().sort((a,b)=>b.date.localeCompare(a.date));
+  const rangeKey = document.getElementById('historyRange').value;
+  const { from, to } = rangeBounds(rangeKey);
+  let items = transactions.filter(t=>t.type!=='transfer');
+  if(from) items = items.filter(t=>t.date>=from && t.date<=to);
+  items = items.slice().sort((a,b)=>b.date.localeCompare(a.date));
+
   list.innerHTML = items.length ? items.map(t=>{
     const c = catById(t.catId) || { icon:'🏷️', name:'(ไม่ระบุหมวดหมู่)' };
     const w = walletById(t.walletId) || { name:'(ไม่ระบุกระเป๋า)' };
-    return `<div class="tx-row">
+    return `<div class="tx-row" data-id="${t.id}">
       <div class="tx-icon">${c.icon}</div>
       <div class="tx-mid">
         <div class="tx-title">${t.note || c.name}</div>
@@ -793,7 +889,7 @@ function renderExpense(){
       </div>
       <div class="tx-amt ${t.amount<0?'down':'up'} tabular">${t.amount<0?'':'+'}${thb(t.amount)}</div>
     </div>`;
-  }).join('') : `<p style="color:var(--text-soft); font-size:13.5px; padding:16px 2px;">ยังไม่มีรายการ — กดปุ่ม + เพื่อเริ่มบันทึก</p>`;
+  }).join('') : `<p style="color:var(--text-soft); font-size:13.5px; padding:16px 2px;">ไม่มีรายการในช่วงนี้</p>`;
 
   const ym = todayStr().slice(0,7);
   const spent = transactions.filter(t=>t.type==='expense' && t.date.startsWith(ym))
@@ -801,6 +897,7 @@ function renderExpense(){
   document.getElementById('budgetSpent').textContent = thb(spent);
   document.getElementById('budgetFill').style.width = Math.min(100, spent/25000*100)+'%';
 }
+document.getElementById('historyRange').addEventListener('change', renderExpense);
 
 /* ============ RENDER: INVEST ============ */
 function assetCard(a, isTrade){
@@ -891,18 +988,24 @@ document.querySelectorAll('nav.tabs button').forEach(btn=>{
 /* ============ QUICK-ADD SHEET ============ */
 const sheetBackdrop = document.getElementById('sheetBackdrop');
 let txType = 'expense';
+let editingTxId = null;
 
-function fillSelects(){
+function fillSelects(keepDate){
   const catSel = document.getElementById('txCategory');
   catSel.innerHTML = categories.filter(c=>c.type===txType).map(c=>`<option value="${c.id}">${c.icon} ${c.name}</option>`).join('');
   const wSel = document.getElementById('txWallet');
   wSel.innerHTML = wallets.map(w=>`<option value="${w.id}">${w.icon} ${w.name}</option>`).join('');
-  document.getElementById('txDate').value = todayStr();
+  if(!keepDate) document.getElementById('txDate').value = todayStr();
 }
 document.getElementById('fabAdd').addEventListener('click', ()=>{
+  editingTxId = null;
   txType='expense';
+  document.getElementById('txSheetTitle').textContent = 'บันทึกรายการ';
+  document.getElementById('deleteTx').style.display='none';
   document.getElementById('typeExpense').classList.add('sel');
   document.getElementById('typeIncome').classList.remove('sel');
+  document.getElementById('txAmount').value='';
+  document.getElementById('txNote').value='';
   fillSelects();
   sheetBackdrop.classList.add('open');
 });
@@ -913,13 +1016,33 @@ document.getElementById('typeExpense').addEventListener('click', ()=>{
   txType='expense';
   document.getElementById('typeExpense').classList.add('sel');
   document.getElementById('typeIncome').classList.remove('sel');
-  fillSelects();
+  fillSelects(true);
 });
 document.getElementById('typeIncome').addEventListener('click', ()=>{
   txType='income';
   document.getElementById('typeIncome').classList.add('sel');
   document.getElementById('typeExpense').classList.remove('sel');
-  fillSelects();
+  fillSelects(true);
+});
+
+document.getElementById('txList').addEventListener('click', e=>{
+  const row = e.target.closest('.tx-row');
+  if(!row) return;
+  const t = transactions.find(x=>x.id===row.dataset.id);
+  if(!t) return;
+  editingTxId = t.id;
+  txType = t.type;
+  document.getElementById('txSheetTitle').textContent = 'แก้ไขรายการ';
+  document.getElementById('deleteTx').style.display='';
+  document.getElementById('typeExpense').classList.toggle('sel', txType==='expense');
+  document.getElementById('typeIncome').classList.toggle('sel', txType==='income');
+  fillSelects(true);
+  document.getElementById('txAmount').value = Math.abs(t.amount);
+  document.getElementById('txCategory').value = t.catId || '';
+  document.getElementById('txWallet').value = t.walletId || '';
+  document.getElementById('txNote').value = t.note || '';
+  document.getElementById('txDate').value = t.date;
+  sheetBackdrop.classList.add('open');
 });
 
 document.getElementById('saveTx').addEventListener('click', async ()=>{
@@ -933,16 +1056,49 @@ document.getElementById('saveTx').addEventListener('click', async ()=>{
 
   const saveBtn = document.getElementById('saveTx');
   saveBtn.disabled = true;
-  const wallet = wallets.find(w=>w.id===walletId);
-  await sb.from('transactions').insert([{ date, type:txType, amount:signedAmount, wallet_id:walletId, category_id:categoryId, note }]);
-  if(wallet){
-    await sb.from('wallets').update({ balance: Number(wallet.balance)+signedAmount }).eq('id', walletId);
+
+  if(editingTxId){
+    const old = transactions.find(t=>t.id===editingTxId);
+    if(old.walletId === walletId){
+      const w = wallets.find(x=>x.id===walletId);
+      if(w) await sb.from('wallets').update({ balance: Number(w.balance) + (signedAmount - old.amount) }).eq('id', walletId);
+    } else {
+      if(old.walletId){
+        const ow = wallets.find(x=>x.id===old.walletId);
+        if(ow) await sb.from('wallets').update({ balance: Number(ow.balance) - old.amount }).eq('id', old.walletId);
+      }
+      const nw = wallets.find(x=>x.id===walletId);
+      if(nw) await sb.from('wallets').update({ balance: Number(nw.balance) + signedAmount }).eq('id', walletId);
+    }
+    await sb.from('transactions').update({ date, type:txType, amount:signedAmount, wallet_id:walletId, category_id:categoryId, note }).eq('id', editingTxId);
+  } else {
+    const wallet = wallets.find(w=>w.id===walletId);
+    await sb.from('transactions').insert([{ date, type:txType, amount:signedAmount, wallet_id:walletId, category_id:categoryId, note }]);
+    if(wallet){
+      await sb.from('wallets').update({ balance: Number(wallet.balance)+signedAmount }).eq('id', walletId);
+    }
   }
+
   document.getElementById('txAmount').value='';
   document.getElementById('txNote').value='';
+  editingTxId = null;
   sheetBackdrop.classList.remove('open');
   await refreshAll();
   saveBtn.disabled = false;
+});
+
+document.getElementById('deleteTx').addEventListener('click', async ()=>{
+  if(!editingTxId) return;
+  if(!confirm('ลบรายการนี้ใช่ไหม? จะปรับยอดกระเป๋าคืนให้ด้วย')) return;
+  const old = transactions.find(t=>t.id===editingTxId);
+  if(old && old.walletId){
+    const w = wallets.find(x=>x.id===old.walletId);
+    if(w) await sb.from('wallets').update({ balance: Number(w.balance) - old.amount }).eq('id', old.walletId);
+  }
+  await sb.from('transactions').delete().eq('id', editingTxId);
+  editingTxId = null;
+  sheetBackdrop.classList.remove('open');
+  await refreshAll();
 });
 
 /* ============ DCA SHEET ============ */
@@ -1016,6 +1172,174 @@ document.getElementById('saveDca').addEventListener('click', async ()=>{
   document.getElementById('dcaUnits').value='';
   await refreshAll();
   saveBtn.disabled = false;
+});
+
+/* ============ REPORTS & EXPORT ============ */
+let reportPeriodType = 'month';
+let reportAnchor = new Date();
+const thaiMonthsFull = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+
+function startOfWeek(d){ const x=new Date(d); const day=x.getDay(); x.setDate(x.getDate()-day); x.setHours(0,0,0,0); return x; }
+function pad2(n){ return String(n).padStart(2,'0'); }
+function fmtDate(d){ return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; }
+
+function currentPeriodBounds(){
+  const d = reportAnchor;
+  if(reportPeriodType==='day'){ const s=fmtDate(d); return { from:s, to:s, label: d.toLocaleDateString('th-TH', {day:'numeric', month:'long', year:'numeric'}) }; }
+  if(reportPeriodType==='week'){
+    const s = startOfWeek(d); const e = new Date(s); e.setDate(e.getDate()+6);
+    return { from:fmtDate(s), to:fmtDate(e), label: `${fmtDate(s)} – ${fmtDate(e)}` };
+  }
+  if(reportPeriodType==='year'){
+    const y=d.getFullYear();
+    return { from:`${y}-01-01`, to:`${y}-12-31`, label:`ปี ${y+543}` };
+  }
+  // month (default)
+  const y=d.getFullYear(), m=d.getMonth();
+  const s = new Date(y,m,1), e = new Date(y,m+1,0);
+  return { from:fmtDate(s), to:fmtDate(e), label:`${thaiMonthsFull[m]} ${y+543}` };
+}
+
+function shiftPeriod(dir){
+  const d = new Date(reportAnchor);
+  if(reportPeriodType==='day') d.setDate(d.getDate()+dir);
+  else if(reportPeriodType==='week') d.setDate(d.getDate()+7*dir);
+  else if(reportPeriodType==='year') d.setFullYear(d.getFullYear()+dir);
+  else d.setMonth(d.getMonth()+dir);
+  reportAnchor = d;
+  renderReports();
+}
+
+function renderReports(){
+  const { from, to, label } = currentPeriodBounds();
+  document.getElementById('periodLabel').textContent = label;
+  const items = transactions.filter(t=>t.type!=='transfer' && t.date>=from && t.date<=to);
+  const inc = items.filter(t=>t.amount>0).reduce((s,t)=>s+t.amount,0);
+  const exp = Math.abs(items.filter(t=>t.amount<0).reduce((s,t)=>s+t.amount,0));
+  document.getElementById('repIncome').textContent = '+'+thb(inc);
+  document.getElementById('repExpense').textContent = '-'+thb(exp);
+  document.getElementById('repNet').textContent = thb(inc-exp);
+
+  const byCat = {};
+  items.filter(t=>t.amount<0).forEach(t=>{
+    const c = catById(t.catId);
+    const key = c ? c.name : '(ไม่ระบุหมวดหมู่)';
+    const icon = c ? c.icon : '🏷️';
+    byCat[key] = byCat[key] || { amount:0, icon };
+    byCat[key].amount += Math.abs(t.amount);
+  });
+  const sorted = Object.entries(byCat).sort((a,b)=>b[1].amount-a[1].amount);
+  const max = sorted.length ? sorted[0][1].amount : 1;
+  document.getElementById('repBreakdown').innerHTML = sorted.length ? sorted.map(([name, v])=>`
+    <div class="breakdown-row">
+      <div class="breakdown-top"><span>${v.icon} ${name}</span><span class="tabular">${thb(v.amount)}</span></div>
+      <div class="breakdown-track"><div class="breakdown-fill" style="width:${(v.amount/max*100).toFixed(1)}%"></div></div>
+    </div>`).join('') : `<p style="color:var(--text-soft); font-size:13px;">ไม่มีรายจ่ายในช่วงนี้</p>`;
+}
+
+['periodDay','periodWeek','periodMonth','periodYear'].forEach(id=>{
+  document.getElementById(id).addEventListener('click', ()=>{
+    ['periodDay','periodWeek','periodMonth','periodYear'].forEach(x=>document.getElementById(x).classList.remove('sel'));
+    document.getElementById(id).classList.add('sel');
+    reportPeriodType = { periodDay:'day', periodWeek:'week', periodMonth:'month', periodYear:'year' }[id];
+    reportAnchor = new Date();
+    renderReports();
+  });
+});
+document.getElementById('periodPrev').addEventListener('click', ()=>shiftPeriod(-1));
+document.getElementById('periodNext').addEventListener('click', ()=>shiftPeriod(1));
+
+/* ---- export range selection ---- */
+document.getElementById('exportRange').addEventListener('change', e=>{
+  document.getElementById('exportCustomRange').style.display = e.target.value==='custom' ? '' : 'none';
+});
+
+function exportRangeBounds(){
+  const key = document.getElementById('exportRange').value;
+  if(key==='custom'){
+    return { from: document.getElementById('exportFrom').value, to: document.getElementById('exportTo').value };
+  }
+  return rangeBounds(key);
+}
+
+function getExportRows(){
+  const { from, to } = exportRangeBounds();
+  let items = transactions.filter(t=>t.type!=='transfer');
+  if(from) items = items.filter(t=>t.date>=from && t.date<=to);
+  items = items.slice().sort((a,b)=>a.date.localeCompare(b.date));
+  return items.map(t=>{
+    const c = catById(t.catId);
+    const w = walletById(t.walletId);
+    return {
+      วันที่: t.date,
+      ประเภท: t.type==='income' ? 'รายรับ' : 'รายจ่าย',
+      หมวดหมู่: c ? c.name : '',
+      กระเป๋า: w ? w.name : '',
+      จำนวนเงิน: t.amount,
+      บันทึก: t.note || '',
+    };
+  });
+}
+
+function downloadBlob(content, filename, mime){
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+document.getElementById('exportCsv').addEventListener('click', ()=>{
+  const rows = getExportRows();
+  if(!rows.length){ alert('ไม่มีรายการในช่วงเวลาที่เลือก'); return; }
+  const headers = Object.keys(rows[0]);
+  const csv = [headers.join(',')].concat(
+    rows.map(r=>headers.map(h=>`"${String(r[h]).replace(/"/g,'""')}"`).join(','))
+  ).join('\n');
+  downloadBlob('\uFEFF'+csv, `เดินบัญชี-${todayStr()}.csv`, 'text/csv;charset=utf-8;');
+});
+
+document.getElementById('exportXlsx').addEventListener('click', ()=>{
+  const rows = getExportRows();
+  if(!rows.length){ alert('ไม่มีรายการในช่วงเวลาที่เลือก'); return; }
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'รายการ');
+  XLSX.writeFile(wb, `เดินบัญชี-${todayStr()}.xlsx`);
+});
+
+document.getElementById('exportPdf').addEventListener('click', ()=>{
+  const rows = getExportRows();
+  if(!rows.length){ alert('ไม่มีรายการในช่วงเวลาที่เลือก'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  let y = 15;
+  doc.setFontSize(14);
+  doc.text('Transaction Report — เดินบัญชี', 14, y); y+=8;
+  doc.setFontSize(9);
+  doc.text('Date / Type / Category / Wallet / Amount / Note', 14, y); y+=6;
+  rows.forEach(r=>{
+    if(y > 280){ doc.addPage(); y=15; }
+    const line = `${r.วันที่}  ${r.ประเภท}  ${r.หมวดหมู่}  ${r.กระเป๋า}  ${r.จำนวนเงิน}  ${r.บันทึก}`;
+    doc.text(line, 14, y);
+    y += 6;
+  });
+  doc.save(`เดินบัญชี-${todayStr()}.pdf`);
+});
+
+document.getElementById('exportJson').addEventListener('click', ()=>{
+  const rows = getExportRows();
+  if(!rows.length){ alert('ไม่มีรายการในช่วงเวลาที่เลือก'); return; }
+  downloadBlob(JSON.stringify(rows, null, 2), `เดินบัญชี-${todayStr()}.json`, 'application/json');
+});
+
+document.getElementById('exportFullBackup').addEventListener('click', ()=>{
+  const backup = {
+    exported_at: new Date().toISOString(),
+    wallets, categories, transactions, assets, brokerAccounts, allocTargets, ratioInputs,
+  };
+  downloadBlob(JSON.stringify(backup, null, 2), `เดินบัญชี-backup-${todayStr()}.json`, 'application/json');
 });
 
 /* ============ MANAGE WALLETS & CATEGORIES ============ */
