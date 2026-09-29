@@ -470,10 +470,11 @@
 <!-- Manage wallets & categories -->
 <div class="sheet-backdrop" id="manageBackdrop">
   <div class="sheet">
-    <h2>จัดการกระเป๋า & หมวดหมู่</h2>
+    <h2>จัดการข้อมูล</h2>
     <div class="toggle-row">
       <button class="sel" id="manageWalletsBtn" type="button">กระเป๋าเงิน</button>
       <button id="manageCatsBtn" type="button">หมวดหมู่</button>
+      <button id="manageAssetsBtn" type="button">สินทรัพย์ลงทุน</button>
     </div>
 
     <div id="manageWalletsPane">
@@ -496,6 +497,39 @@
         <input id="newCatName" placeholder="ชื่อหมวดหมู่">
         <button class="btn-ghost" id="addCatBtn" type="button">+ เพิ่ม</button>
       </div>
+    </div>
+
+    <div id="manageAssetsPane" style="display:none">
+      <div class="manage-list" id="assetManageList"></div>
+      <label>ประเภท</label>
+      <select id="newAssetGroup">
+        <option value="thai_stock">หุ้นไทย</option>
+        <option value="foreign_etf">ETF ต่างประเทศ</option>
+        <option value="ssf_rmf">SSF / RMF</option>
+        <option value="gold">ทองคำ</option>
+        <option value="broker">บัญชีเทรด (Webull/Forex ฯลฯ)</option>
+      </select>
+      <label>ชื่อ</label>
+      <input id="newAssetName" placeholder="เช่น VOO, ADVANC, Webull">
+      <label>คำอธิบายสั้นๆ (ไม่บังคับ)</label>
+      <input id="newAssetSub" placeholder="เช่น ETF · S&P500">
+      <div id="assetFieldsGroup">
+        <label>จำนวนหน่วยเริ่มต้น</label>
+        <input id="newAssetUnits" type="number" inputmode="decimal" placeholder="0">
+        <label>ต้นทุนเฉลี่ยต่อหน่วย</label>
+        <input id="newAssetAvgCost" type="number" inputmode="decimal" placeholder="0.00">
+        <label>ราคาตลาดปัจจุบันต่อหน่วย</label>
+        <input id="newAssetPrice" type="number" inputmode="decimal" placeholder="0.00">
+        <label>ปันผลโดยประมาณ %/ปี (ไม่บังคับ)</label>
+        <input id="newAssetDivYield" type="number" inputmode="decimal" placeholder="0.0">
+      </div>
+      <div id="brokerFieldsGroup" style="display:none">
+        <label>ยอดคงเหลือปัจจุบัน</label>
+        <input id="newAssetBalance" type="number" inputmode="decimal" placeholder="0.00">
+        <label>กำไร/ขาดทุน % สะสม</label>
+        <input id="newAssetPlPct" type="number" inputmode="decimal" placeholder="0.0">
+      </div>
+      <button class="btn-primary" id="addAssetBtn" type="button" style="width:100%; margin-top:14px;">+ เพิ่มสินทรัพย์</button>
     </div>
 
     <div class="sheet-actions">
@@ -915,6 +949,13 @@ document.getElementById('saveTx').addEventListener('click', async ()=>{
 const dcaBackdrop = document.getElementById('dcaBackdrop');
 let dcaAction = 'buy';
 document.getElementById('openDca').addEventListener('click', ()=>{
+  if(flatAssets().length===0){
+    alert('ยังไม่มีสินทรัพย์ในระบบ — เพิ่มก่อนที่ปุ่ม ⚙ > สินทรัพย์ลงทุน แล้วค่อยกลับมาบันทึก DCA');
+    renderManageAssets();
+    manageBackdrop.classList.add('open');
+    document.getElementById('manageAssetsBtn').click();
+    return;
+  }
   const sel = document.getElementById('dcaAsset');
   sel.innerHTML = flatAssets().map(a=>`<option value="${a.id}">${a.name}</option>`).join('');
   const wSel = document.getElementById('dcaWallet');
@@ -1008,16 +1049,82 @@ manageBackdrop.addEventListener('click', e=>{ if(e.target===manageBackdrop) mana
 document.getElementById('manageWalletsBtn').addEventListener('click', ()=>{
   document.getElementById('manageWalletsBtn').classList.add('sel');
   document.getElementById('manageCatsBtn').classList.remove('sel');
+  document.getElementById('manageAssetsBtn').classList.remove('sel');
   document.getElementById('manageWalletsPane').style.display='';
   document.getElementById('manageCatsPane').style.display='none';
+  document.getElementById('manageAssetsPane').style.display='none';
 });
 document.getElementById('manageCatsBtn').addEventListener('click', ()=>{
   document.getElementById('manageCatsBtn').classList.add('sel');
   document.getElementById('manageWalletsBtn').classList.remove('sel');
+  document.getElementById('manageAssetsBtn').classList.remove('sel');
   document.getElementById('manageCatsPane').style.display='';
   document.getElementById('manageWalletsPane').style.display='none';
+  document.getElementById('manageAssetsPane').style.display='none';
   renderManageCats();
 });
+document.getElementById('manageAssetsBtn').addEventListener('click', ()=>{
+  document.getElementById('manageAssetsBtn').classList.add('sel');
+  document.getElementById('manageWalletsBtn').classList.remove('sel');
+  document.getElementById('manageCatsBtn').classList.remove('sel');
+  document.getElementById('manageAssetsPane').style.display='';
+  document.getElementById('manageWalletsPane').style.display='none';
+  document.getElementById('manageCatsPane').style.display='none';
+  renderManageAssets();
+});
+document.getElementById('newAssetGroup').addEventListener('change', e=>{
+  const isBroker = e.target.value==='broker';
+  document.getElementById('assetFieldsGroup').style.display = isBroker?'none':'';
+  document.getElementById('brokerFieldsGroup').style.display = isBroker?'':'none';
+});
+
+function renderManageAssets(){
+  const rows = [
+    ...assets.thai.map(a=>({...a, groupLabel:'หุ้นไทย', table:'assets'})),
+    ...assets.etf.map(a=>({...a, groupLabel:'ETF ต่างประเทศ', table:'assets'})),
+    ...assets.ssf.map(a=>({...a, groupLabel:'SSF/RMF', table:'assets'})),
+    ...assets.gold.map(a=>({...a, groupLabel:'ทองคำ', table:'assets'})),
+    ...brokerAccounts.map(a=>({...a, groupLabel:'บัญชีเทรด', table:'broker_accounts'})),
+  ];
+  document.getElementById('assetManageList').innerHTML = rows.length ? rows.map(a=>`
+    <div class="manage-row">
+      <span class="mn">${a.name} <span style="color:var(--text-soft); font-size:11.5px;">· ${a.groupLabel}</span></span>
+      <button class="mx" data-id="${a.id}" data-table="${a.table}" type="button">×</button>
+    </div>`).join('') : `<p style="color:var(--text-soft); font-size:13px; margin:0 0 12px;">ยังไม่มีสินทรัพย์ — เพิ่มด้านล่างได้เลย</p>`;
+}
+
+document.getElementById('assetManageList').addEventListener('click', async e=>{
+  const id = e.target.dataset.id, table = e.target.dataset.table;
+  if(!id) return;
+  if(!confirm('ลบรายการนี้ใช่ไหม?')) return;
+  await sb.from(table).delete().eq('id', id);
+  await refreshAll();
+  renderManageAssets();
+});
+
+document.getElementById('addAssetBtn').addEventListener('click', async ()=>{
+  const group = document.getElementById('newAssetGroup').value;
+  const name = document.getElementById('newAssetName').value.trim();
+  const sub = document.getElementById('newAssetSub').value.trim();
+  if(!name) return;
+  if(group==='broker'){
+    const balance = parseFloat(document.getElementById('newAssetBalance').value)||0;
+    const plPct = parseFloat(document.getElementById('newAssetPlPct').value)||0;
+    await sb.from('broker_accounts').insert([{ name, sub, balance, pl_pct:plPct }]);
+  } else {
+    const units = parseFloat(document.getElementById('newAssetUnits').value)||0;
+    const avgCost = parseFloat(document.getElementById('newAssetAvgCost').value)||0;
+    const price = parseFloat(document.getElementById('newAssetPrice').value)||0;
+    const divYieldRaw = document.getElementById('newAssetDivYield').value;
+    const divYield = divYieldRaw ? parseFloat(divYieldRaw) : null;
+    await sb.from('assets').insert([{ name, sub, group_type:group, units, avg_cost:avgCost, current_price:price, dividend_yield:divYield }]);
+  }
+  ['newAssetName','newAssetSub','newAssetUnits','newAssetAvgCost','newAssetPrice','newAssetDivYield','newAssetBalance','newAssetPlPct']
+    .forEach(id=>{ document.getElementById(id).value=''; });
+  await refreshAll();
+  renderManageAssets();
+});
+
 document.getElementById('catTypeExpenseBtn').addEventListener('click', ()=>{
   manageCatType='expense';
   document.getElementById('catTypeExpenseBtn').classList.add('sel');
