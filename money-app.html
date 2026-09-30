@@ -75,6 +75,11 @@
     -webkit-font-smoothing:antialiased;
   }
   .tabular{ font-variant-numeric: tabular-nums; }
+  body.privacy-on .tabular,
+  body.privacy-on .blur-sensitive{ filter: blur(6px); user-select:none; transition: filter .15s ease; }
+  .archive-toggle{ background:none; border:none; color:var(--text-soft); font-size:12px; text-decoration:underline; cursor:pointer; padding:6px 0; margin-bottom:8px; }
+  .manage-row.archived{ opacity:.6; }
+  .manage-row .restore-btn{ border:none; background:transparent; color:var(--jade); font-size:12px; font-weight:600; cursor:pointer; padding:2px 8px; }
 
   /* ---------- Header / Nav ---------- */
   header.app-header{
@@ -339,6 +344,7 @@
         <span class="sub">เงิน · การลงทุน · ทุกวัน</span>
       </div>
       <div class="brand-row-btns">
+        <button class="icon-btn" id="privacyBtn" title="ซ่อนตัวเลข">👁</button>
         <button class="icon-btn" id="openManage" title="จัดการกระเป๋า/หมวดหมู่">⚙</button>
         <button class="icon-btn" id="logoutBtn" title="ออกจากระบบ">⎋</button>
       </div>
@@ -369,12 +375,12 @@
     <div class="grid-2">
       <div class="panel">
         <h3>สัดส่วนสินทรัพย์</h3>
-        <canvas id="donutChart" height="220"></canvas>
+        <canvas id="donutChart" class="blur-sensitive" height="220"></canvas>
         <div class="legend" id="donutLegend"></div>
       </div>
       <div class="panel">
         <h3>รายรับ-รายจ่าย 6 เดือนล่าสุด</h3>
-        <canvas id="barChart" height="220"></canvas>
+        <canvas id="barChart" class="blur-sensitive" height="220"></canvas>
       </div>
     </div>
   </section>
@@ -384,7 +390,7 @@
     <div class="budget-bar">
       <div class="budget-top">
         <span>งบใช้จ่ายเดือนนี้</span>
-        <span><b id="budgetSpent">฿0</b> / ฿25,000</span>
+        <span><b id="budgetSpent" class="tabular">฿0</b> / ฿25,000</span>
       </div>
       <div class="budget-track"><div class="budget-fill" id="budgetFill" style="width:0%"></div></div>
     </div>
@@ -564,6 +570,8 @@
         <input id="newWalletName" placeholder="ชื่อกระเป๋า เช่น SCB">
         <button class="btn-ghost" id="addWalletBtn" type="button">+ เพิ่ม</button>
       </div>
+      <button class="archive-toggle" id="toggleArchivedWallets" type="button">ดูกระเป๋าที่เก็บเข้าคลัง</button>
+      <div class="manage-list" id="walletArchivedList" style="display:none;"></div>
     </div>
 
     <div id="manageCatsPane" style="display:none">
@@ -577,6 +585,8 @@
         <input id="newCatName" placeholder="ชื่อหมวดหมู่">
         <button class="btn-ghost" id="addCatBtn" type="button">+ เพิ่ม</button>
       </div>
+      <button class="archive-toggle" id="toggleArchivedCats" type="button">ดูหมวดหมู่ที่เก็บเข้าคลัง</button>
+      <div class="manage-list" id="catArchivedList" style="display:none;"></div>
     </div>
 
     <div id="manageAssetsPane" style="display:none">
@@ -645,9 +655,11 @@ const catById = id => categories.find(c=>c.id===id);
 const walletById = id => wallets.find(w=>w.id===id);
 const todayStr = () => new Date().toISOString().slice(0,10);
 const flatAssets = () => [...assets.thai, ...assets.etf, ...assets.ssf, ...assets.gold];
+const activeWallets = () => wallets.filter(w=>!w.archived);
+const activeCategories = () => categories.filter(c=>!c.archived);
 
 function computeNetWorth(){
-  const cash = wallets.reduce((s,w)=>s+Number(w.balance||0),0);
+  const cash = activeWallets().reduce((s,w)=>s+Number(w.balance||0),0);
   const thai = assets.thai.reduce((s,a)=>s+a.units*a.price,0);
   const etf  = assets.etf.reduce((s,a)=>s+a.units*a.price,0);
   const ssf  = assets.ssf.reduce((s,a)=>s+a.units*a.price,0);
@@ -714,8 +726,8 @@ document.getElementById('logoutBtn').addEventListener('click', async ()=>{
 /* ============ DATA LOADING ============ */
 async function loadAllData(){
   const [wRes, cRes, tRes, aRes, bRes, atRes, riRes] = await Promise.all([
-    sb.from('wallets').select('*').eq('archived', false).order('created_at'),
-    sb.from('categories').select('*').eq('archived', false).order('created_at'),
+    sb.from('wallets').select('*').order('created_at'),
+    sb.from('categories').select('*').order('created_at'),
     sb.from('transactions').select('*').order('date', { ascending:false }).limit(5000),
     sb.from('assets').select('*').eq('archived', false).order('created_at'),
     sb.from('broker_accounts').select('*').order('created_at'),
@@ -992,9 +1004,9 @@ let editingTxId = null;
 
 function fillSelects(keepDate){
   const catSel = document.getElementById('txCategory');
-  catSel.innerHTML = categories.filter(c=>c.type===txType).map(c=>`<option value="${c.id}">${c.icon} ${c.name}</option>`).join('');
+  catSel.innerHTML = activeCategories().filter(c=>c.type===txType).map(c=>`<option value="${c.id}">${c.icon} ${c.name}</option>`).join('');
   const wSel = document.getElementById('txWallet');
-  wSel.innerHTML = wallets.map(w=>`<option value="${w.id}">${w.icon} ${w.name}</option>`).join('');
+  wSel.innerHTML = activeWallets().map(w=>`<option value="${w.id}">${w.icon} ${w.name}</option>`).join('');
   if(!keepDate) document.getElementById('txDate').value = todayStr();
 }
 document.getElementById('fabAdd').addEventListener('click', ()=>{
@@ -1037,6 +1049,14 @@ document.getElementById('txList').addEventListener('click', e=>{
   document.getElementById('typeExpense').classList.toggle('sel', txType==='expense');
   document.getElementById('typeIncome').classList.toggle('sel', txType==='income');
   fillSelects(true);
+  const wOpt = walletById(t.walletId);
+  if(wOpt && wOpt.archived){
+    document.getElementById('txWallet').insertAdjacentHTML('afterbegin', `<option value="${wOpt.id}">${wOpt.icon} ${wOpt.name} (เก็บเข้าคลัง)</option>`);
+  }
+  const cOpt = catById(t.catId);
+  if(cOpt && cOpt.archived){
+    document.getElementById('txCategory').insertAdjacentHTML('afterbegin', `<option value="${cOpt.id}">${cOpt.icon} ${cOpt.name} (เก็บเข้าคลัง)</option>`);
+  }
   document.getElementById('txAmount').value = Math.abs(t.amount);
   document.getElementById('txCategory').value = t.catId || '';
   document.getElementById('txWallet').value = t.walletId || '';
@@ -1115,7 +1135,7 @@ document.getElementById('openDca').addEventListener('click', ()=>{
   const sel = document.getElementById('dcaAsset');
   sel.innerHTML = flatAssets().map(a=>`<option value="${a.id}">${a.name}</option>`).join('');
   const wSel = document.getElementById('dcaWallet');
-  wSel.innerHTML = `<option value="">— ไม่บันทึกโอนออก —</option>` + wallets.map(w=>`<option value="${w.id}">${w.icon} ${w.name}</option>`).join('');
+  wSel.innerHTML = `<option value="">— ไม่บันทึกโอนออก —</option>` + activeWallets().map(w=>`<option value="${w.id}">${w.icon} ${w.name}</option>`).join('');
   document.getElementById('dcaDate').value = todayStr();
   dcaBackdrop.classList.add('open');
 });
@@ -1347,21 +1367,59 @@ const manageBackdrop = document.getElementById('manageBackdrop');
 let manageCatType = 'expense';
 
 function renderManageWallets(){
-  document.getElementById('walletManageList').innerHTML = wallets.map(w=>`
+  document.getElementById('walletManageList').innerHTML = activeWallets().map(w=>`
     <div class="manage-row">
       <span class="mi">${w.icon}</span>
       <span class="mn">${w.name}</span>
-      <button class="mx" data-id="${w.id}" type="button">×</button>
+      <button class="mx" data-id="${w.id}" type="button" title="เก็บเข้าคลัง">📥</button>
     </div>`).join('');
+  const archived = wallets.filter(w=>w.archived);
+  document.getElementById('toggleArchivedWallets').textContent = `ดูกระเป๋าที่เก็บเข้าคลัง (${archived.length})`;
+  document.getElementById('walletArchivedList').innerHTML = archived.map(w=>`
+    <div class="manage-row archived">
+      <span class="mi">${w.icon}</span>
+      <span class="mn">${w.name}</span>
+      <button class="restore-btn" data-id="${w.id}" type="button">กู้คืน</button>
+    </div>`).join('') || `<p style="color:var(--text-soft); font-size:12.5px;">ไม่มีกระเป๋าที่เก็บไว้</p>`;
 }
 function renderManageCats(){
-  document.getElementById('catManageList').innerHTML = categories.filter(c=>c.type===manageCatType).map(c=>`
+  document.getElementById('catManageList').innerHTML = activeCategories().filter(c=>c.type===manageCatType).map(c=>`
     <div class="manage-row">
       <span class="mi">${c.icon}</span>
       <span class="mn">${c.name}</span>
-      <button class="mx" data-id="${c.id}" type="button">×</button>
+      <button class="mx" data-id="${c.id}" type="button" title="เก็บเข้าคลัง">📥</button>
     </div>`).join('');
+  const archived = categories.filter(c=>c.archived && c.type===manageCatType);
+  document.getElementById('toggleArchivedCats').textContent = `ดูหมวดหมู่ที่เก็บเข้าคลัง (${archived.length})`;
+  document.getElementById('catArchivedList').innerHTML = archived.map(c=>`
+    <div class="manage-row archived">
+      <span class="mi">${c.icon}</span>
+      <span class="mn">${c.name}</span>
+      <button class="restore-btn" data-id="${c.id}" type="button">กู้คืน</button>
+    </div>`).join('') || `<p style="color:var(--text-soft); font-size:12.5px;">ไม่มีหมวดหมู่ที่เก็บไว้</p>`;
 }
+document.getElementById('toggleArchivedWallets').addEventListener('click', ()=>{
+  const el = document.getElementById('walletArchivedList');
+  el.style.display = el.style.display==='none' ? '' : 'none';
+});
+document.getElementById('toggleArchivedCats').addEventListener('click', ()=>{
+  const el = document.getElementById('catArchivedList');
+  el.style.display = el.style.display==='none' ? '' : 'none';
+});
+document.getElementById('walletArchivedList').addEventListener('click', async e=>{
+  const id = e.target.dataset.id;
+  if(!id || !e.target.classList.contains('restore-btn')) return;
+  await sb.from('wallets').update({ archived:false }).eq('id', id);
+  await refreshAll();
+  renderManageWallets();
+});
+document.getElementById('catArchivedList').addEventListener('click', async e=>{
+  const id = e.target.dataset.id;
+  if(!id || !e.target.classList.contains('restore-btn')) return;
+  await sb.from('categories').update({ archived:false }).eq('id', id);
+  await refreshAll();
+  renderManageCats();
+});
 
 document.getElementById('openManage').addEventListener('click', ()=>{
   renderManageWallets();
@@ -1465,16 +1523,16 @@ document.getElementById('catTypeIncomeBtn').addEventListener('click', ()=>{
 document.getElementById('walletManageList').addEventListener('click', async e=>{
   const id = e.target.dataset.id;
   if(!id) return;
-  if(!confirm('ลบกระเป๋านี้ใช่ไหม? รายการเก่าที่เคยผูกไว้จะยังอยู่ แต่จะไม่ระบุกระเป๋า')) return;
-  await sb.from('wallets').delete().eq('id', id);
+  if(!confirm('เก็บกระเป๋านี้เข้าคลังใช่ไหม? จะไม่แสดงในลิสต์เลือกกระเป๋าอีก แต่ประวัติรายการเก่ายังอยู่ครบ กู้คืนได้ทีหลัง')) return;
+  await sb.from('wallets').update({ archived:true }).eq('id', id);
   await refreshAll();
   renderManageWallets();
 });
 document.getElementById('catManageList').addEventListener('click', async e=>{
   const id = e.target.dataset.id;
   if(!id) return;
-  if(!confirm('ลบหมวดหมู่นี้ใช่ไหม? รายการเก่าที่เคยผูกไว้จะยังอยู่ แต่จะไม่ระบุหมวดหมู่')) return;
-  await sb.from('categories').delete().eq('id', id);
+  if(!confirm('เก็บหมวดหมู่นี้เข้าคลังใช่ไหม? จะไม่แสดงในลิสต์เลือกหมวดหมู่อีก แต่ประวัติรายการเก่ายังอยู่ครบ กู้คืนได้ทีหลัง')) return;
+  await sb.from('categories').update({ archived:true }).eq('id', id);
   await refreshAll();
   renderManageCats();
 });
@@ -1499,6 +1557,20 @@ document.getElementById('addCatBtn').addEventListener('click', async ()=>{
   await refreshAll();
   renderManageCats();
 });
+
+/* ============ PRIVACY MODE ============ */
+let privacyMode = false;
+try{ privacyMode = localStorage.getItem('privacyMode') === '1'; }catch(e){}
+function applyPrivacyMode(){
+  document.body.classList.toggle('privacy-on', privacyMode);
+  document.getElementById('privacyBtn').textContent = privacyMode ? '🙈' : '👁';
+}
+document.getElementById('privacyBtn').addEventListener('click', ()=>{
+  privacyMode = !privacyMode;
+  try{ localStorage.setItem('privacyMode', privacyMode?'1':'0'); }catch(e){}
+  applyPrivacyMode();
+});
+applyPrivacyMode();
 
 /* ============ INIT ============ */
 checkSession();
