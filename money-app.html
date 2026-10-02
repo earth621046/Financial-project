@@ -136,6 +136,13 @@
   .hero-sub .item{ font-size:13.5px; color:var(--text-soft); }
   .hero-sub .item b{ display:block; font-size:16px; color:var(--text); margin-top:2px; }
   .up{ color:var(--jade); } .down{ color:var(--maroon); }
+  .compare-card{ margin-top:16px; }
+  .compare-top{ display:flex; align-items:flex-start; justify-content:space-between; }
+  .compare-number{ font-family:var(--serif); font-weight:700; font-size:30px; margin:0; }
+  .compare-badge{ font-size:13px; font-weight:700; padding:6px 12px; border-radius:999px; white-space:nowrap; }
+  .compare-badge.badge-up{ color:var(--maroon); background:rgba(178,59,59,0.12); }
+  .compare-badge.badge-down{ color:var(--jade); background:rgba(47,125,83,0.12); }
+  .compare-badge.badge-flat{ color:var(--text-soft); background:var(--paper-3); }
 
   .grid-2{ display:grid; grid-template-columns:1fr; gap:16px; margin-top:16px; }
   @media(min-width:720px){ .grid-2{ grid-template-columns:1fr 1.15fr; } }
@@ -352,7 +359,7 @@
     <nav class="tabs">
       <button class="active" data-view="overview">ภาพรวม</button>
       <button data-view="expense">รายรับ-รายจ่าย</button>
-      <button data-view="invest">พอร์ตลงทุน</button>
+      <button data-view="invest">สินทรัพย์รวม</button>
       <button data-view="reports">สรุป & ส่งออก</button>
     </nav>
   </div>
@@ -372,6 +379,16 @@
       </div>
     </div>
 
+    <div class="panel compare-card">
+      <div class="compare-top">
+        <div>
+          <p class="hero-label" style="margin-bottom:4px;">ยอดใช้จ่ายเดือนนี้</p>
+          <p class="compare-number tabular" id="compareExpense">฿0</p>
+        </div>
+        <div class="compare-badge" id="compareBadge">—</div>
+      </div>
+    </div>
+
     <div class="grid-2">
       <div class="panel">
         <h3>สัดส่วนสินทรัพย์</h3>
@@ -379,7 +396,7 @@
         <div class="legend" id="donutLegend"></div>
       </div>
       <div class="panel">
-        <h3>รายรับ-รายจ่าย 6 เดือนล่าสุด</h3>
+        <h3>เทียบเดือนที่แล้ว-เดือนนี้</h3>
         <canvas id="barChart" class="blur-sensitive" height="220"></canvas>
       </div>
     </div>
@@ -411,8 +428,13 @@
   <!-- ===================== INVEST ===================== -->
   <section class="view" id="view-invest">
     <div class="row-between">
-      <p class="section-label" style="margin:0;">พอร์ตการลงทุน</p>
+      <p class="section-label" style="margin:0;">สินทรัพย์รวม</p>
       <button class="btn-ghost" id="openDca">+ บันทึก DCA</button>
+    </div>
+
+    <div class="asset-group">
+      <h3>กระเป๋าเงิน</h3>
+      <div id="grp-wallets"></div>
     </div>
 
     <div class="panel" style="margin-bottom:18px;">
@@ -669,18 +691,17 @@ function computeNetWorth(){
 }
 
 function computeMonthly(){
-  const thaiMonths = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
   const now = new Date();
   const labels=[], income=[], expense=[];
-  for(let i=5;i>=0;i--){
+  for(let i=1;i>=0;i--){
     const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
     const ym = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-    labels.push(thaiMonths[d.getMonth()]);
+    labels.push(i===0 ? 'เดือนนี้' : 'เดือนที่แล้ว');
     const monthTx = transactions.filter(t=>t.type!=='transfer' && t.date.startsWith(ym));
     income.push(monthTx.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0));
     expense.push(monthTx.filter(t=>t.type==='expense').reduce((s,t)=>s+Math.abs(t.amount),0));
   }
-  return { labels, income, expense };
+  return { labels, income, expense }; // index 0 = last month, index 1 = this month
 }
 
 /* ============ AUTH ============ */
@@ -856,6 +877,26 @@ function renderOverview(){
     `<span><span class="dot" style="background:${donutColors[i]}"></span>${l}</span>`).join('');
 
   const monthly = computeMonthly();
+  const lastExp = monthly.expense[0], thisExp = monthly.expense[1];
+  document.getElementById('compareExpense').textContent = thb(thisExp);
+  const badge = document.getElementById('compareBadge');
+  if(lastExp > 0){
+    const pct = ((thisExp - lastExp) / lastExp * 100);
+    if(Math.abs(pct) < 0.5){
+      badge.textContent = '≈ เท่าเดือนที่แล้ว';
+      badge.className = 'compare-badge badge-flat';
+    } else if(pct > 0){
+      badge.textContent = `▲ ${pct.toFixed(0)}% จากเดือนที่แล้ว`;
+      badge.className = 'compare-badge badge-up';
+    } else {
+      badge.textContent = `▼ ${Math.abs(pct).toFixed(0)}% จากเดือนที่แล้ว`;
+      badge.className = 'compare-badge badge-down';
+    }
+  } else {
+    badge.textContent = thisExp > 0 ? 'เดือนที่แล้วไม่มีข้อมูล' : '—';
+    badge.className = 'compare-badge badge-flat';
+  }
+
   if(barChartInstance) barChartInstance.destroy();
   barChartInstance = new Chart(document.getElementById('barChart'), {
     type:'bar',
@@ -977,9 +1018,17 @@ function renderRatios(){
     card('Wealth Ratio (อิสรภาพทางการเงิน)', wealth, wealth>=1?'สินทรัพย์เลี้ยงรายจ่ายได้แล้ว ✓':'เป้าหมาย > 1.00 = สินทรัพย์เลี้ยงรายจ่ายได้เอง');
 }
 
+function walletCard(w){
+  return `<div class="asset-card">
+    <div><div class="asset-name">${w.icon} ${w.name}</div></div>
+    <div><div class="asset-value tabular">${thb(Number(w.balance||0))}</div></div>
+  </div>`;
+}
 function renderInvest(){
   renderAllocation();
   renderRatios();
+  const aw = activeWallets();
+  document.getElementById('grp-wallets').innerHTML = aw.length ? aw.map(walletCard).join('') : `<p style="color:var(--text-soft); font-size:13px;">ยังไม่มีกระเป๋า เพิ่มได้ที่ปุ่ม ⚙</p>`;
   document.getElementById('grp-thai').innerHTML = assets.thai.length ? assets.thai.map(a=>assetCard(a,false)).join('') : `<p style="color:var(--text-soft); font-size:13px;">ยังไม่มีรายการ</p>`;
   document.getElementById('grp-etf').innerHTML = assets.etf.length ? assets.etf.map(a=>assetCard(a,false)).join('') : `<p style="color:var(--text-soft); font-size:13px;">ยังไม่มีรายการ</p>`;
   document.getElementById('grp-ssf').innerHTML = assets.ssf.length ? assets.ssf.map(a=>assetCard(a,false)).join('') : `<p style="color:var(--text-soft); font-size:13px;">ยังไม่มีรายการ</p>`;
