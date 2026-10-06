@@ -167,6 +167,10 @@
 
   .section-label{ font-size:13px; color:var(--text-soft); margin:22px 0 8px; }
   .tx-list{ display:flex; flex-direction:column; border-top:1px solid var(--line); }
+  .day-group{ margin-bottom:2px; }
+  .day-header{ display:flex; justify-content:space-between; align-items:baseline; padding:16px 2px 6px; border-bottom:1px solid var(--line); margin-bottom:2px; }
+  .day-header .dh-date{ font-size:12.5px; font-weight:700; color:var(--text-soft); }
+  .day-header .dh-total{ font-size:12.5px; font-weight:700; }
   .tx-row{
     display:flex; align-items:center; gap:12px;
     padding:12px 2px; border-bottom:1px solid var(--line);
@@ -404,25 +408,35 @@
 
   <!-- ===================== EXPENSE ===================== -->
   <section class="view" id="view-expense">
+    <select id="expenseWalletFilter" style="margin-bottom:14px;">
+      <option value="">🗂️ ทั้งหมด (รวมทุกกระเป๋า)</option>
+    </select>
+
+    <div class="panel" style="margin-bottom:16px;">
+      <p class="hero-label" style="margin-bottom:2px;">ยอดคงเหลือ</p>
+      <p class="compare-number tabular" id="expenseBalance">฿0</p>
+      <div class="period-nav" style="margin:16px 0 12px;">
+        <button class="btn-ghost" id="expPeriodPrev" type="button">‹</button>
+        <span class="period-label" id="expPeriodLabel">—</span>
+        <button class="btn-ghost" id="expPeriodNext" type="button">›</button>
+      </div>
+      <div class="hero-sub">
+        <div class="item">รายรับ<b class="up tabular" id="expIncome">+฿0</b></div>
+        <div class="item">รายจ่าย<b class="down tabular" id="expExpense">-฿0</b></div>
+        <div class="item">คงเหลือสุทธิ<b class="tabular" id="expNet">฿0</b></div>
+      </div>
+    </div>
+
     <div class="budget-bar">
       <div class="budget-top">
-        <span>งบใช้จ่ายเดือนนี้</span>
+        <span>งบใช้จ่ายเดือนนี้ (ปฏิทินจริง)</span>
         <span><b id="budgetSpent" class="tabular">฿0</b> / ฿25,000</span>
       </div>
       <div class="budget-track"><div class="budget-fill" id="budgetFill" style="width:0%"></div></div>
     </div>
 
-    <div class="row-between" style="margin-bottom:8px;">
-      <p class="section-label" style="margin:0;">ประวัติรายการ (แตะเพื่อแก้ไข)</p>
-      <select id="historyRange" style="width:auto; padding:6px 10px; font-size:12.5px;">
-        <option value="month">เดือนนี้</option>
-        <option value="lastMonth">เดือนก่อน</option>
-        <option value="3months">3 เดือนล่าสุด</option>
-        <option value="year">ปีนี้</option>
-        <option value="all">ทั้งหมด</option>
-      </select>
-    </div>
-    <div class="tx-list" id="txList"></div>
+    <p class="section-label">ประวัติรายการ (แตะเพื่อแก้ไข)</p>
+    <div id="txList"></div>
   </section>
 
   <!-- ===================== INVEST ===================== -->
@@ -530,13 +544,20 @@
     <div class="toggle-row">
       <button class="sel" id="typeExpense" type="button">รายจ่าย</button>
       <button id="typeIncome" type="button">รายรับ</button>
+      <button id="typeTransfer" type="button">โอนเงิน</button>
     </div>
     <label>จำนวนเงิน (บาท)</label>
     <input class="amt-input tabular" id="txAmount" type="number" inputmode="decimal" placeholder="0.00">
-    <label>หมวดหมู่</label>
-    <select id="txCategory"></select>
-    <label>กระเป๋าเงิน</label>
+    <div id="txCategoryField">
+      <label>หมวดหมู่</label>
+      <select id="txCategory"></select>
+    </div>
+    <label id="txWalletLabel">กระเป๋าเงิน</label>
     <select id="txWallet"></select>
+    <div id="txToWalletField" style="display:none;">
+      <label>โอนไปยังกระเป๋า</label>
+      <select id="txToWallet"></select>
+    </div>
     <label>บันทึกช่วยจำ</label>
     <input id="txNote" type="text" placeholder="เช่น กะเพราไก่ไข่ดาว">
     <label>วันที่</label>
@@ -589,9 +610,11 @@
       <div class="manage-list" id="walletManageList"></div>
       <div class="add-row">
         <input id="newWalletIcon" placeholder="🏷️" maxlength="2">
-        <input id="newWalletName" placeholder="ชื่อกระเป๋า เช่น SCB">
+        <input id="newWalletName" placeholder="ชื่อกระเป๋า เช่น บัตรเครดิต SCB">
         <button class="btn-ghost" id="addWalletBtn" type="button">+ เพิ่ม</button>
       </div>
+      <label style="margin-top:10px;">หมวดหมู่เริ่มต้น (ไม่บังคับ — เช่น ตั้งบัตรเครดิตให้ default เป็น "อาหาร & เครื่องดื่ม")</label>
+      <select id="newWalletDefaultCat"><option value="">— ไม่ตั้งค่าเริ่มต้น —</option></select>
       <button class="archive-toggle" id="toggleArchivedWallets" type="button">ดูกระเป๋าที่เก็บเข้าคลัง</button>
       <div class="manage-list" id="walletArchivedList" style="display:none;"></div>
     </div>
@@ -893,7 +916,7 @@ function renderOverview(){
       badge.className = 'compare-badge badge-down';
     }
   } else {
-    badge.textContent = thisExp > 0 ? 'เดือนที่แล้วไม่มีข้อมูล' : '—';
+    badge.textContent = thisExp > 0 ? 'เดือนที่แล้วไม่มีข้อมูล' : 'ยังไม่มีข้อมูล 2 เดือนนี้';
     badge.className = 'compare-badge badge-flat';
   }
 
@@ -923,26 +946,94 @@ function rangeBounds(key, anchor){
   return { from:null, to:null }; // 'all'
 }
 
+const thaiWeekdays = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+function formatDayHeader(dateStr){
+  const d = new Date(dateStr+'T00:00:00');
+  return `วัน${thaiWeekdays[d.getDay()]} ${d.getDate()} ${thaiMonthsFull[d.getMonth()]} ${d.getFullYear()+543}`;
+}
+
+let expenseAnchor = new Date();
+function expensePeriodBounds(){
+  const y = expenseAnchor.getFullYear(), m = expenseAnchor.getMonth();
+  const pad = n => String(n).padStart(2,'0');
+  const fmt = dt => `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}`;
+  const s = new Date(y,m,1), e = new Date(y,m+1,0);
+  return { from: fmt(s), to: fmt(e), label: `${thaiMonthsFull[m]} ${y+543}` };
+}
+
+function populateExpenseWalletFilter(){
+  const sel = document.getElementById('expenseWalletFilter');
+  const current = sel.value;
+  sel.innerHTML = `<option value="">🗂️ ทั้งหมด (รวมทุกกระเป๋า)</option>` +
+    activeWallets().map(w=>`<option value="${w.id}">${w.icon} ${w.name}</option>`).join('');
+  if([...sel.options].some(o=>o.value===current)) sel.value = current;
+}
+
 function renderExpense(){
-  const list = document.getElementById('txList');
-  const rangeKey = document.getElementById('historyRange').value;
-  const { from, to } = rangeBounds(rangeKey);
-  let items = transactions.filter(t=>t.type!=='transfer');
-  if(from) items = items.filter(t=>t.date>=from && t.date<=to);
+  populateExpenseWalletFilter();
+  const walletFilter = document.getElementById('expenseWalletFilter').value;
+  const { from, to, label } = expensePeriodBounds();
+  document.getElementById('expPeriodLabel').textContent = label;
+
+  let items = transactions.filter(t=>t.date>=from && t.date<=to);
+  if(walletFilter) items = items.filter(t=>t.walletId===walletFilter || t.toWalletId===walletFilter);
   items = items.slice().sort((a,b)=>b.date.localeCompare(a.date));
 
-  list.innerHTML = items.length ? items.map(t=>{
-    const c = catById(t.catId) || { icon:'🏷️', name:'(ไม่ระบุหมวดหมู่)' };
-    const w = walletById(t.walletId) || { name:'(ไม่ระบุกระเป๋า)' };
-    return `<div class="tx-row" data-id="${t.id}">
-      <div class="tx-icon">${c.icon}</div>
-      <div class="tx-mid">
-        <div class="tx-title">${t.note || c.name}</div>
-        <div class="tx-meta">${c.name} · ${w.name} · ${t.date}</div>
-      </div>
-      <div class="tx-amt ${t.amount<0?'down':'up'} tabular">${t.amount<0?'':'+'}${thb(t.amount)}</div>
-    </div>`;
-  }).join('') : `<p style="color:var(--text-soft); font-size:13.5px; padding:16px 2px;">ไม่มีรายการในช่วงนี้</p>`;
+  const nonTransfer = items.filter(t=>t.type!=='transfer');
+  const inc = nonTransfer.filter(t=>t.amount>0).reduce((s,t)=>s+t.amount,0);
+  const exp = Math.abs(nonTransfer.filter(t=>t.amount<0).reduce((s,t)=>s+t.amount,0));
+  document.getElementById('expIncome').textContent = '+'+thb(inc);
+  document.getElementById('expExpense').textContent = '-'+thb(exp);
+  document.getElementById('expNet').textContent = thb(inc-exp);
+
+  const balance = walletFilter
+    ? Number((walletById(walletFilter)||{balance:0}).balance||0)
+    : activeWallets().reduce((s,w)=>s+Number(w.balance||0),0);
+  document.getElementById('expenseBalance').textContent = thb(balance);
+
+  const list = document.getElementById('txList');
+  if(!items.length){
+    list.innerHTML = `<p style="color:var(--text-soft); font-size:13.5px; padding:16px 2px;">ไม่มีรายการในเดือนนี้</p>`;
+  } else {
+    const byDay = {};
+    items.forEach(t=>{ (byDay[t.date] = byDay[t.date] || []).push(t); });
+    const days = Object.keys(byDay).sort((a,b)=>b.localeCompare(a));
+    list.innerHTML = days.map(d=>{
+      const dayItems = byDay[d];
+      const dayTotal = dayItems.filter(t=>t.type!=='transfer').reduce((s,t)=>s+t.amount,0);
+      const rows = dayItems.map(t=>{
+        if(t.type==='transfer'){
+          const fw = walletById(t.walletId) || { name:'(ไม่ระบุ)' };
+          const tw = walletById(t.toWalletId) || { name:'(ไม่ระบุ)' };
+          return `<div class="tx-row" data-id="${t.id}">
+            <div class="tx-icon">🔁</div>
+            <div class="tx-mid">
+              <div class="tx-title">โอนเงิน</div>
+              <div class="tx-meta">${fw.name} → ${tw.name}${t.note?(' · '+t.note):''}</div>
+            </div>
+            <div class="tx-amt tabular" style="color:var(--text-soft);">${thb(t.amount)}</div>
+          </div>`;
+        }
+        const c = catById(t.catId) || { icon:'🏷️', name:'(ไม่ระบุหมวดหมู่)' };
+        const w = walletById(t.walletId) || { name:'(ไม่ระบุกระเป๋า)' };
+        return `<div class="tx-row" data-id="${t.id}">
+          <div class="tx-icon">${c.icon}</div>
+          <div class="tx-mid">
+            <div class="tx-title">${t.note || c.name}</div>
+            <div class="tx-meta">${c.name} · ${w.name}</div>
+          </div>
+          <div class="tx-amt ${t.amount<0?'down':'up'} tabular">${t.amount<0?'':'+'}${thb(t.amount)}</div>
+        </div>`;
+      }).join('');
+      return `<div class="day-group">
+        <div class="day-header">
+          <span class="dh-date">${formatDayHeader(d)}</span>
+          <span class="dh-total ${dayTotal<0?'down':'up'} tabular">${dayTotal<0?'':'+'}${thb(dayTotal)}</span>
+        </div>
+        ${rows}
+      </div>`;
+    }).join('');
+  }
 
   const ym = todayStr().slice(0,7);
   const spent = transactions.filter(t=>t.type==='expense' && t.date.startsWith(ym))
@@ -950,7 +1041,15 @@ function renderExpense(){
   document.getElementById('budgetSpent').textContent = thb(spent);
   document.getElementById('budgetFill').style.width = Math.min(100, spent/25000*100)+'%';
 }
-document.getElementById('historyRange').addEventListener('change', renderExpense);
+document.getElementById('expenseWalletFilter').addEventListener('change', renderExpense);
+document.getElementById('expPeriodPrev').addEventListener('click', ()=>{
+  expenseAnchor = new Date(expenseAnchor.getFullYear(), expenseAnchor.getMonth()-1, 1);
+  renderExpense();
+});
+document.getElementById('expPeriodNext').addEventListener('click', ()=>{
+  expenseAnchor = new Date(expenseAnchor.getFullYear(), expenseAnchor.getMonth()+1, 1);
+  renderExpense();
+});
 
 /* ============ RENDER: INVEST ============ */
 function assetCard(a, isTrade){
@@ -1051,20 +1150,40 @@ const sheetBackdrop = document.getElementById('sheetBackdrop');
 let txType = 'expense';
 let editingTxId = null;
 
+function applyTxTypeUI(){
+  document.getElementById('typeExpense').classList.toggle('sel', txType==='expense');
+  document.getElementById('typeIncome').classList.toggle('sel', txType==='income');
+  document.getElementById('typeTransfer').classList.toggle('sel', txType==='transfer');
+  const isTransfer = txType==='transfer';
+  document.getElementById('txCategoryField').style.display = isTransfer ? 'none' : '';
+  document.getElementById('txToWalletField').style.display = isTransfer ? '' : 'none';
+  document.getElementById('txWalletLabel').textContent = isTransfer ? 'จากกระเป๋า' : 'กระเป๋าเงิน';
+}
 function fillSelects(keepDate){
   const catSel = document.getElementById('txCategory');
   catSel.innerHTML = activeCategories().filter(c=>c.type===txType).map(c=>`<option value="${c.id}">${c.icon} ${c.name}</option>`).join('');
   const wSel = document.getElementById('txWallet');
   wSel.innerHTML = activeWallets().map(w=>`<option value="${w.id}">${w.icon} ${w.name}</option>`).join('');
+  const toSel = document.getElementById('txToWallet');
+  toSel.innerHTML = activeWallets().map(w=>`<option value="${w.id}">${w.icon} ${w.name}</option>`).join('');
   if(!keepDate) document.getElementById('txDate').value = todayStr();
+  applyTxTypeUI();
+  applyWalletDefaultCategory();
 }
+function applyWalletDefaultCategory(){
+  if(txType!=='expense') return;
+  const w = walletById(document.getElementById('txWallet').value);
+  if(w && w.default_category_id){
+    document.getElementById('txCategory').value = w.default_category_id;
+  }
+}
+document.getElementById('txWallet').addEventListener('change', applyWalletDefaultCategory);
+
 document.getElementById('fabAdd').addEventListener('click', ()=>{
   editingTxId = null;
   txType='expense';
   document.getElementById('txSheetTitle').textContent = 'บันทึกรายการ';
   document.getElementById('deleteTx').style.display='none';
-  document.getElementById('typeExpense').classList.add('sel');
-  document.getElementById('typeIncome').classList.remove('sel');
   document.getElementById('txAmount').value='';
   document.getElementById('txNote').value='';
   fillSelects();
@@ -1073,18 +1192,9 @@ document.getElementById('fabAdd').addEventListener('click', ()=>{
 document.getElementById('cancelTx').addEventListener('click', ()=>sheetBackdrop.classList.remove('open'));
 sheetBackdrop.addEventListener('click', e=>{ if(e.target===sheetBackdrop) sheetBackdrop.classList.remove('open'); });
 
-document.getElementById('typeExpense').addEventListener('click', ()=>{
-  txType='expense';
-  document.getElementById('typeExpense').classList.add('sel');
-  document.getElementById('typeIncome').classList.remove('sel');
-  fillSelects(true);
-});
-document.getElementById('typeIncome').addEventListener('click', ()=>{
-  txType='income';
-  document.getElementById('typeIncome').classList.add('sel');
-  document.getElementById('typeExpense').classList.remove('sel');
-  fillSelects(true);
-});
+document.getElementById('typeExpense').addEventListener('click', ()=>{ txType='expense'; fillSelects(true); });
+document.getElementById('typeIncome').addEventListener('click', ()=>{ txType='income'; fillSelects(true); });
+document.getElementById('typeTransfer').addEventListener('click', ()=>{ txType='transfer'; fillSelects(true); });
 
 document.getElementById('txList').addEventListener('click', e=>{
   const row = e.target.closest('.tx-row');
@@ -1095,57 +1205,93 @@ document.getElementById('txList').addEventListener('click', e=>{
   txType = t.type;
   document.getElementById('txSheetTitle').textContent = 'แก้ไขรายการ';
   document.getElementById('deleteTx').style.display='';
-  document.getElementById('typeExpense').classList.toggle('sel', txType==='expense');
-  document.getElementById('typeIncome').classList.toggle('sel', txType==='income');
   fillSelects(true);
   const wOpt = walletById(t.walletId);
   if(wOpt && wOpt.archived){
     document.getElementById('txWallet').insertAdjacentHTML('afterbegin', `<option value="${wOpt.id}">${wOpt.icon} ${wOpt.name} (เก็บเข้าคลัง)</option>`);
   }
-  const cOpt = catById(t.catId);
-  if(cOpt && cOpt.archived){
-    document.getElementById('txCategory').insertAdjacentHTML('afterbegin', `<option value="${cOpt.id}">${cOpt.icon} ${cOpt.name} (เก็บเข้าคลัง)</option>`);
-  }
   document.getElementById('txAmount').value = Math.abs(t.amount);
-  document.getElementById('txCategory').value = t.catId || '';
   document.getElementById('txWallet').value = t.walletId || '';
+  if(txType==='transfer'){
+    const toOpt = walletById(t.toWalletId);
+    if(toOpt && toOpt.archived){
+      document.getElementById('txToWallet').insertAdjacentHTML('afterbegin', `<option value="${toOpt.id}">${toOpt.icon} ${toOpt.name} (เก็บเข้าคลัง)</option>`);
+    }
+    document.getElementById('txToWallet').value = t.toWalletId || '';
+  } else {
+    const cOpt = catById(t.catId);
+    if(cOpt && cOpt.archived){
+      document.getElementById('txCategory').insertAdjacentHTML('afterbegin', `<option value="${cOpt.id}">${cOpt.icon} ${cOpt.name} (เก็บเข้าคลัง)</option>`);
+    }
+    document.getElementById('txCategory').value = t.catId || '';
+  }
   document.getElementById('txNote').value = t.note || '';
   document.getElementById('txDate').value = t.date;
   sheetBackdrop.classList.add('open');
 });
 
+/* balance deltas: sign=+1 to apply a transaction's effect, sign=-1 to reverse it.
+   Computed purely in-memory first so same-wallet edits never read a stale balance mid-sequence. */
+function txDeltas(tx, sign){
+  const d = {};
+  if(!tx) return d;
+  if(tx.type==='transfer'){
+    if(tx.walletId) d[tx.walletId] = (d[tx.walletId]||0) - sign*tx.amount;
+    if(tx.toWalletId) d[tx.toWalletId] = (d[tx.toWalletId]||0) + sign*tx.amount;
+  } else if(tx.walletId){
+    d[tx.walletId] = (d[tx.walletId]||0) + sign*tx.amount;
+  }
+  return d;
+}
+async function applyDeltas(deltas){
+  for(const wid in deltas){
+    if(!deltas[wid]) continue;
+    const w = wallets.find(x=>x.id===wid);
+    if(w) await sb.from('wallets').update({ balance: Number(w.balance) + deltas[wid] }).eq('id', wid);
+  }
+}
+
 document.getElementById('saveTx').addEventListener('click', async ()=>{
   const amt = parseFloat(document.getElementById('txAmount').value);
   if(!amt) return;
-  const walletId = document.getElementById('txWallet').value;
-  const categoryId = document.getElementById('txCategory').value;
   const date = document.getElementById('txDate').value || todayStr();
   const note = document.getElementById('txNote').value;
-  const signedAmount = txType==='expense' ? -Math.abs(amt) : Math.abs(amt);
-
   const saveBtn = document.getElementById('saveTx');
   saveBtn.disabled = true;
 
+  let newTx;
+  if(txType==='transfer'){
+    const fromId = document.getElementById('txWallet').value;
+    const toId = document.getElementById('txToWallet').value;
+    if(!fromId || !toId || fromId===toId){
+      alert('เลือกกระเป๋าต้นทางและปลายทางให้ต่างกันก่อนนะครับ');
+      saveBtn.disabled = false;
+      return;
+    }
+    newTx = { type:'transfer', amount:Math.abs(amt), walletId:fromId, toWalletId:toId, categoryId:null };
+  } else {
+    const walletId = document.getElementById('txWallet').value;
+    const categoryId = document.getElementById('txCategory').value;
+    newTx = { type:txType, amount: txType==='expense' ? -Math.abs(amt) : Math.abs(amt), walletId, toWalletId:null, categoryId };
+  }
+
   if(editingTxId){
     const old = transactions.find(t=>t.id===editingTxId);
-    if(old.walletId === walletId){
-      const w = wallets.find(x=>x.id===walletId);
-      if(w) await sb.from('wallets').update({ balance: Number(w.balance) + (signedAmount - old.amount) }).eq('id', walletId);
-    } else {
-      if(old.walletId){
-        const ow = wallets.find(x=>x.id===old.walletId);
-        if(ow) await sb.from('wallets').update({ balance: Number(ow.balance) - old.amount }).eq('id', old.walletId);
-      }
-      const nw = wallets.find(x=>x.id===walletId);
-      if(nw) await sb.from('wallets').update({ balance: Number(nw.balance) + signedAmount }).eq('id', walletId);
-    }
-    await sb.from('transactions').update({ date, type:txType, amount:signedAmount, wallet_id:walletId, category_id:categoryId, note }).eq('id', editingTxId);
+    const deltas = {};
+    [txDeltas(old,-1), txDeltas(newTx,1)].forEach(part=>{
+      for(const k in part) deltas[k] = (deltas[k]||0) + part[k];
+    });
+    await applyDeltas(deltas);
+    await sb.from('transactions').update({
+      date, type:newTx.type, amount:newTx.amount,
+      wallet_id:newTx.walletId, to_wallet_id:newTx.toWalletId, category_id:newTx.categoryId, note
+    }).eq('id', editingTxId);
   } else {
-    const wallet = wallets.find(w=>w.id===walletId);
-    await sb.from('transactions').insert([{ date, type:txType, amount:signedAmount, wallet_id:walletId, category_id:categoryId, note }]);
-    if(wallet){
-      await sb.from('wallets').update({ balance: Number(wallet.balance)+signedAmount }).eq('id', walletId);
-    }
+    await sb.from('transactions').insert([{
+      date, type:newTx.type, amount:newTx.amount,
+      wallet_id:newTx.walletId, to_wallet_id:newTx.toWalletId, category_id:newTx.categoryId, note
+    }]);
+    await applyDeltas(txDeltas(newTx, 1));
   }
 
   document.getElementById('txAmount').value='';
@@ -1160,10 +1306,7 @@ document.getElementById('deleteTx').addEventListener('click', async ()=>{
   if(!editingTxId) return;
   if(!confirm('ลบรายการนี้ใช่ไหม? จะปรับยอดกระเป๋าคืนให้ด้วย')) return;
   const old = transactions.find(t=>t.id===editingTxId);
-  if(old && old.walletId){
-    const w = wallets.find(x=>x.id===old.walletId);
-    if(w) await sb.from('wallets').update({ balance: Number(w.balance) - old.amount }).eq('id', old.walletId);
-  }
+  if(old) await applyDeltas(txDeltas(old, -1));
   await sb.from('transactions').delete().eq('id', editingTxId);
   editingTxId = null;
   sheetBackdrop.classList.remove('open');
@@ -1416,6 +1559,12 @@ const manageBackdrop = document.getElementById('manageBackdrop');
 let manageCatType = 'expense';
 
 function renderManageWallets(){
+  const defCatSel = document.getElementById('newWalletDefaultCat');
+  const keepVal = defCatSel.value;
+  defCatSel.innerHTML = `<option value="">— ไม่ตั้งค่าเริ่มต้น —</option>` +
+    activeCategories().filter(c=>c.type==='expense').map(c=>`<option value="${c.id}">${c.icon} ${c.name}</option>`).join('');
+  if([...defCatSel.options].some(o=>o.value===keepVal)) defCatSel.value = keepVal;
+
   document.getElementById('walletManageList').innerHTML = activeWallets().map(w=>`
     <div class="manage-row">
       <span class="mi">${w.icon}</span>
@@ -1590,9 +1739,11 @@ document.getElementById('addWalletBtn').addEventListener('click', async ()=>{
   const name = document.getElementById('newWalletName').value.trim();
   if(!name) return;
   const icon = document.getElementById('newWalletIcon').value.trim() || '💳';
-  await sb.from('wallets').insert([{ name, icon, balance:0 }]);
+  const defaultCatId = document.getElementById('newWalletDefaultCat').value || null;
+  await sb.from('wallets').insert([{ name, icon, balance:0, default_category_id: defaultCatId }]);
   document.getElementById('newWalletIcon').value='';
   document.getElementById('newWalletName').value='';
+  document.getElementById('newWalletDefaultCat').value='';
   await refreshAll();
   renderManageWallets();
 });
